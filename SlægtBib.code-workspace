@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.fontSize": 14,
+		"terminal.integrated.fontSize": 14,
+		"chat.editor.fontSize": 14,
+		"scm.inputFontSize": 14,
+		"debug.console.fontSize": 14
+	}
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="da">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Danskernes Historie Online</title>
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    </head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Danskernes Historie Online</h1>
+        </div>
+    </header>
+    
+    <main>
+        <section class="search-section">
+            <form method="POST" action="/search">
+                <div class="search-bar">
+                    <input id="search_text" name="search_text" type="search" placeholder="Semantisk søgning" value="{{ search_text }}">
+                    <button type="submit" name="search_button">Søg</button>
+                </div>
+            </form>
+            <ul id="search_results">
+                {% for result in search_results %}
+                <li>
+                    <div class="flex-container">
+                        <div class="flex-item">Distance: {{ result.distance }}</div>
+                        <div class="flex-item flex-grow">Forfatter: {{ result.forfatter }}</div>
+                        <div class="flex-item flex-grow">Titel: {{ result.titel }}</div>
+                        <div class="flex-item"><a href='{{ result.pdf_navn }}')" target="_blank">Vis bog</a></div>
+                    </div>
+                    <div>
+                        <textarea rows="5">{{ result.chunk }}</textarea>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </section>
+    </main>
+    <script>
+        const searchTextInput = document.getElementById('search_text');
+        const searchButton = document.querySelector('button[name="search_button"]');
+      
+        searchTextInput.addEventListener('input', function() {
+          searchButton.disabled = searchTextInput.value.trim() === '';
+        });
+     </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Ignore the virtual environment
+venv/
+
+# Ignore the .env file
+.env
+
+# Ignore all files with the .pyc extension
+*.pyc
+
+# Ignore the __pycache__ directory
+__pycache__/
+
+# Ignore the .vscode directory (if using Visual Studio Code)
+.vscode/
+
+# Ignore the .DS_Store file (if using macOS)
+.DS_Store
