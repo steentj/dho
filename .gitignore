@@ -15,3 +15,7 @@ __pycache__/
 
 # Ignore the .DS_Store file (if using macOS)
 .DS_Store
+
+# ignore temporary folders for pdf and markdown files
+pdf/
+markdown/
