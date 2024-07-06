@@ -18,7 +18,7 @@
             <form method="POST" action="/search">
                 <div class="search-bar">
                     <input id="search_text" name="search_text" type="search" placeholder="Semantisk søgning" value="{{ search_text }}">
-                    <button type="submit" name="search_button">Søg</button>
+                    <button type="submit" name="search_button" margin="30px">Søg</button>
                 </div>
             </form>
             <ul id="search_results">
@@ -43,6 +43,10 @@
         const searchButton = document.querySelector('button[name="search_button"]');
       
         searchTextInput.addEventListener('input', function() {
+          if (searchTextInput.value.trim() === '') {
+            searchButton.disabled = true;
+            search_results.innerHTML = '';
+          }
           searchButton.disabled = searchTextInput.value.trim() === '';
         });
      </script>

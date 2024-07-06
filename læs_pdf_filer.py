@@ -7,7 +7,7 @@ import psycopg2
 from tqdm import tqdm
 import re
 
-CHUNK_SIZE = 400
+CHUNK_SIZE = 300
 
 
 def get_local_pdf_files():
@@ -154,9 +154,11 @@ def handle_pdf_files(get_books, database, db_user, db_password, openai_client) -
         pdf_pages = extract_text_by_page(pdf)     
 
         for page_no, page_text in tqdm(pdf_pages.items(), desc=f"Chunking"):
-            chunks = chunk_text(page_text, max_tokens=300)
+            chunks = chunk_text(page_text)
 
             for chunk in chunks:
+                if chunk.strip() == "":
+                    continue
                 embed_text = f"##{metadata['title']}##{chunk}"
                 book["chunks"].append((page_no, embed_text))
                 book["embeddings"].append(get_embedding(embed_text, openai_client))

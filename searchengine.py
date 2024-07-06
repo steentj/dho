@@ -44,7 +44,7 @@ class SearchEngine:
         cur.execute(
             "SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding <=> %s AS distance "
             "FROM books b inner join chunks c on b.id = c.book_id "
-            "ORDER BY embedding <=> %s DESC LIMIT 5",
+            "ORDER BY embedding <=> %s ASC LIMIT 5",
             (str(vektor),str(vektor)),
         )
 
