@@ -28,7 +28,7 @@ class SearchEngine:
                 if dokument["forfatter"] == "None" and "" or dokument["forfatter"]
                 else "Ukendt"
             )
-            dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"] + 2)}'
+            dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"] + 1)}'
         return dokumenter
 
     def find_nærmeste(self, vektor: list) -> list:
