@@ -36,12 +36,14 @@ main {
 }
 
 .search-bar {
-    display: inline-block;
+    display: flex;
+    align-items: center;
 }
 
 .search-bar input {
     padding: 10px;
-    width: 600px;
+    flex: 1;
+    min-width: 200px; /* Minimum bredde for søgefeltet */
     border: 1px solid #ccc;
     border-radius: 4px 0 0 4px;
 }
@@ -53,10 +55,28 @@ main {
     color: #fff;
     border-radius: 0 4px 4px 0;
     cursor: pointer;
+    margin-left: 10px; /* Plads mellem søgefelt og knap */
 }
 
 .search-bar button:hover {
     background-color: #4cae4c;
+}
+
+.chunk-options {
+    display: flex;
+    align-items: center;
+    margin-left: 20px; /* Plads mellem knap og chunk-options */
+}
+
+.chunk-options label {
+    margin-right: 10px; /* Plads til højre for label */
+}
+
+.chunk-options input,
+.chunk-options span {
+    margin: 0; /* Fjern marginer for at sikre tæt placering */
+    padding: 0; /* Fjern padding for at sikre tæt placering */
+    min-width: 30px;
 }
 
 .options-section {

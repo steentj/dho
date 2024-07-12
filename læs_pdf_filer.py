@@ -7,7 +7,7 @@ import psycopg2
 from tqdm import tqdm
 import re
 
-CHUNK_SIZE = 300
+CHUNK_SIZE = 500
 
 
 def get_local_pdf_files():
@@ -61,9 +61,9 @@ def extract_text_by_page(pdf) -> dict:
     for page in pdf[1:]:
         text = page.get_text()
         pages_text[page_num] = (
-            text.replace(" \xad\n", "")
+            text.replace(" \xad\n", "") # \xad = blødt mellemrum/linjeskift ( '-' er skjult hvis ikke linjeskift)
             .replace("\xad\n", "")
-            .replace("-\n", "")
+            .replace("-\n", "")         # '-' = hårdt mellemrum/linjeskift ( '-' er altid synlig)
             .replace("- \n", "")
         )
         page_num += 1
@@ -77,6 +77,15 @@ def get_embedding(texts, client, model="text-embedding-3-small"):
 
 
 def extract_text_from_chunk(raw_chunk: str) -> tuple:
+    """
+    Fjerner bogtitlen fra den chunktekst der er lavet embedding af
+
+    Parameters:
+        raw_chunk (str): The raw chunk of text to be split.
+
+    Returns:
+        str: The third part of the split raw chunk.
+    """
     parts = raw_chunk.split("##")
     text = parts[2]
     return text
@@ -128,10 +137,20 @@ def save_book(book, database, db_user, db_password) -> None:
     for (sidenr, chunk), embedding in zip(book["chunks"], book["embeddings"]):
         chunk_tekst = extract_text_from_chunk(chunk)
         cur.execute(
-            "INSERT INTO chunks(book_id, sidenr, chunk, embedding) "
+            "INSERT INTO chunks_large(book_id, sidenr, chunk, embedding) "
             + "VALUES (%s, %s, %s, %s)",
             (book_id, sidenr, chunk_tekst, embedding),
         )
+        # cur.execute(
+        #     "INSERT INTO chunks_small(book_id, sidenr, chunk, embedding) "
+        #     + "VALUES (%s, %s, %s, %s)",
+        #     (book_id, sidenr, chunk_tekst, embedding),
+        # )
+        # cur.execute(
+        #     "INSERT INTO chunks(book_id, sidenr, chunk, embedding) "
+        #     + "VALUES (%s, %s, %s, %s)",
+        #     (book_id, sidenr, chunk_tekst, embedding),
+        # )
 
     cn.commit()
     cur.close()

@@ -14,9 +14,9 @@ class SearchEngine:
         self.db_user = os.getenv("POSTGRES_USER", None)
         self.db_password = os.getenv("POSTGRES_PASSWORD", None)
 
-    def get_results(self, query) -> list:
+    def get_results(self, query: str, chunk_size: str) -> list:
         vektor = self.get_embedding(query, self.client)
-        resultater = self.find_nærmeste(vektor)
+        resultater = self.find_nærmeste(vektor, chunk_size)
         dokumenter = [
             dict(zip(("pdf_navn", "titel", "forfatter", "sidenr", "chunk", "distance"), result))
             for result in resultater
@@ -31,7 +31,7 @@ class SearchEngine:
             dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"] + 1)}'
         return dokumenter
 
-    def find_nærmeste(self, vektor: list) -> list:
+    def find_nærmeste(self, vektor: list, chunk_size: str) -> list:
         cn = psycopg2.connect(
             host="localhost",
             database=self.database,
@@ -41,12 +41,25 @@ class SearchEngine:
 
         cur = cn.cursor()
 
-        cur.execute(
-            "SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding <=> %s AS distance "
-            "FROM books b inner join chunks c on b.id = c.book_id "
-            "ORDER BY embedding <=> %s ASC LIMIT 5",
-            (str(vektor),str(vektor)),
-        )
+        # Supported distance functions are:
+        #     <-> - L2 distance (Euclidean)
+        #     <#> - (negative) inner product
+        #     <=> - cosine distance
+        #     <+> - L1 distance (Manhattan)
+        
+        tabel = ""
+        if chunk_size == "stor":
+            tabel = "chunks_large"
+        elif chunk_size == "lille":
+            tabel = "chunks_small"
+        else:
+            tabel = "chunks"
+
+        sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding <#> %s AS distance " \
+        f"FROM books b inner join {tabel} c on b.id = c.book_id " \
+        f"ORDER BY embedding <#> %s ASC LIMIT 5"
+        print(sql)
+        cur.execute(sql, (str(vektor),str(vektor)),)
 
         results = cur.fetchall()
 

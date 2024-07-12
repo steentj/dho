@@ -20,7 +20,17 @@
                     <input id="search_text" name="search_text" type="search" placeholder="Semantisk søgning" value="{{ search_text }}">
                     <button type="submit" name="search_button" margin="30px">Søg</button>
                 </div>
-            </form>
+                <br/>
+                <br/>
+                <div style="display: grid; grid-template-columns: 250px 600px;">
+                    <div style="align-items: end; padding-left: 50px;">Chunk størrelse i antal ord:</div>
+                    <ul style="list-style-type: none; padding: 0; margin: 0; align-items: start;">
+                        <li style="display: inline;"><label><input type="radio" name="chunk_size" value="lille" {% if chunk_size == 'lille' %}checked{% endif %}> Lille (100)</label></li>
+                        <li style="display: inline;"><label><input type="radio" name="chunk_size" value=" medium" {% if chunk_size == 'medium' %}checked{% endif %}> Medium (300)</label></li>
+                        <li style="display: inline;"><label><input type="radio" name="chunk_size" value="stor" {% if chunk_size == 'stor' %}checked{% endif %}> Stor (500)</label></li>
+                    </ul>
+                </div>
+                </form>
             <ul id="search_results">
                 {% for result in search_results %}
                 <li>
@@ -49,6 +59,12 @@
           }
           searchButton.disabled = searchTextInput.value.trim() === '';
         });
+        
+        function toggleLabel() {
+            const checkbox = document.getElementById('chunk_size');
+            const label = document.getElementById('chunkLabel');
+            label.textContent = checkbox.checked ? 'stor' : 'lille';
+        }
      </script>
 </body>
 </html>
