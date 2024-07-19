@@ -52,12 +52,14 @@ class SearchEngine:
             tabel = "chunks_large"
         elif chunk_size == "lille":
             tabel = "chunks_small"
+        elif chunk_size == "mini":
+            tabel = "chunks_tiny"
         else:
             tabel = "chunks"
 
         sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding <#> %s AS distance " \
         f"FROM books b inner join {tabel} c on b.id = c.book_id " \
-        f"ORDER BY embedding <#> %s ASC LIMIT 5"
+        f"ORDER BY embedding <=> %s ASC LIMIT 5"
         print(sql)
         cur.execute(sql, (str(vektor),str(vektor)),)
 
