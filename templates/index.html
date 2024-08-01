@@ -23,12 +23,23 @@
                 <br/>
                 <br/>
                 <div style="display: grid; grid-template-columns: 250px 600px;">
-                    <div style="align-items: end; padding-left: 50px;">Chunk størrelse i antal ord:</div>
+                    <div style="align-items: start; padding-left: 30px;">Chunk størrelse i antal ord:</div>
                     <ul style="list-style-type: none; padding: 0; margin: 0; align-items: start;">
                         <li style="display: inline;"><label><input type="radio" name="chunk_size" value="mini" {% if chunk_size == 'mini' %}checked{% endif %}> Mini (50)</label></li>
                         <li style="display: inline;"><label><input type="radio" name="chunk_size" value="lille" {% if chunk_size == 'lille' %}checked{% endif %}> Lille (100)</label></li>
-                        <li style="display: inline;"><label><input type="radio" name="chunk_size" value=" medium" {% if chunk_size == 'medium' %}checked{% endif %}> Medium (300)</label></li>
+                        <li style="display: inline;"><label><input type="radio" name="chunk_size" value="medium" {% if chunk_size == 'medium' %}checked{% endif %}> Medium (300)</label></li>
                         <li style="display: inline;"><label><input type="radio" name="chunk_size" value="stor" {% if chunk_size == 'stor' %}checked{% endif %}> Stor (500)</label></li>
+                    </ul>
+                </div>
+                <br/>
+                <br/>
+                <div style="display: grid; grid-template-columns: 250px 600px;">
+                    <div style="align-items: start; padding-left: 30px;">Distancefunktion:</div>
+                    <ul style="list-style-type: none; padding: 0; margin: 0; align-items: start;">
+                        <li style="display: inline;"><label><input type="radio" name="distance_function" value="l2" {% if distance_function == 'l2' %}checked{% endif %}> L2 (Euclidean)</label></li>
+                        <li style="display: inline;"><label><input type="radio" name="distance_function" value="inner_product" {% if distance_function == 'inner_product' %}checked{% endif %}> Inner produkt (cosine)</label></li>
+                        <li style="display: inline;"><label><input type="radio" name="distance_function" value="cosine" {% if distance_function == 'cosine' %}checked{% endif %}> Cosinus</label></li>
+                        <li style="display: inline;"><label><input type="radio" name="distance_function" value="l1" {% if distance_function == 'l1' %}checked{% endif %}> L1 (Manhattan)</label></li>
                     </ul>
                 </div>
                 </form>
@@ -39,6 +50,7 @@
                         <div class="flex-item">Distance: {{ result.distance }}</div>
                         <div class="flex-item flex-grow">Forfatter: {{ result.forfatter }}</div>
                         <div class="flex-item flex-grow">Titel: {{ result.titel }}</div>
+                        <div class="flex-item flex-grow">Side: {{ result.sidenr }}</div>
                         <div class="flex-item"><a href='{{ result.pdf_navn }}')" target="_blank">Vis bog</a></div>
                     </div>
                     <div>

@@ -14,9 +14,9 @@ class SearchEngine:
         self.db_user = os.getenv("POSTGRES_USER", None)
         self.db_password = os.getenv("POSTGRES_PASSWORD", None)
 
-    def get_results(self, query: str, chunk_size: str) -> list:
+    def get_results(self, query: str, chunk_size: str, distance_function: str) -> list:
         vektor = self.get_embedding(query, self.client)
-        resultater = self.find_nærmeste(vektor, chunk_size)
+        resultater = self.find_nærmeste(vektor, chunk_size, distance_function)
         dokumenter = [
             dict(zip(("pdf_navn", "titel", "forfatter", "sidenr", "chunk", "distance"), result))
             for result in resultater
@@ -31,7 +31,7 @@ class SearchEngine:
             dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"] + 1)}'
         return dokumenter
 
-    def find_nærmeste(self, vektor: list, chunk_size: str) -> list:
+    def find_nærmeste(self, vektor: list, chunk_size: str, distance_function: str) -> list:
         cn = psycopg2.connect(
             host="localhost",
             database=self.database,
@@ -57,9 +57,23 @@ class SearchEngine:
         else:
             tabel = "chunks"
 
-        sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding <#> %s AS distance " \
+        distance_operator = ""
+        if distance_function == "cosine":
+            distance_operator = "<=>"
+        elif distance_function == "l1":
+            distance_operator = "<+>"
+        elif distance_function == "inner_product":
+            distance_operator = "<#>"
+        else:
+            distance_operator = "<->"
+
+        print("distance_operator:", distance_operator)
+        print("chunk_size:", tabel)
+
+        sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding {distance_operator} %s AS distance " \
         f"FROM books b inner join {tabel} c on b.id = c.book_id " \
-        f"ORDER BY embedding <=> %s ASC LIMIT 5"
+        f"WHERE length(trim(c.chunk)) > 20 " \
+        f"ORDER BY embedding {distance_operator} %s ASC LIMIT 5"
         print(sql)
         cur.execute(sql, (str(vektor),str(vektor)),)
 
