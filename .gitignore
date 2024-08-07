@@ -7,6 +7,9 @@ venv/
 # Ignore all files with the .pyc extension
 *.pyc
 
+# Ignore all files with the .pdf extension
+*.pdf
+
 # Ignore the __pycache__ directory
 __pycache__/
 
@@ -15,6 +18,12 @@ __pycache__/
 
 # Ignore the .DS_Store file (if using macOS)
 .DS_Store
+
+# Ignore WW2 backup
+WW2*.SQL
+
+# Ignore python environment files
+dho/
 
 # ignore temporary folders for pdf and markdown files
 pdf/
