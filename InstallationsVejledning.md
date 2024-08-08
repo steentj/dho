@@ -21,3 +21,5 @@ Sker manuelt med Pip i _PowerShell_.
 Udføres manuelt af _Slægtsbiblioteket_.
 1. API nøglen og database parametre skal sættes i .env fil.<br>
 Udføres manuelt i _Notepad_.
+
+Al kode ligger på GitHub: https://github.com/steentj/dho

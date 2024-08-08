@@ -1,13 +1,11 @@
 # Semantisk søgning i Danskernes Historie Online (Slægtsbiblioteket) - Proof of Concept
-Dette repository indeholder de Python programmer, der skla bruges for at undersøge om det ermuligt og ønskeligt at udvide 
-søgemulighederne i Slægtsbiblioteket med en AI drevet semntsiak søgning. Der skal opsættes en OpenAI nøgle i en environment fil for at bruge prototypen.
+Dette repository indeholder de Python programmer, der skla bruges for at undersøge om det er muligt og ønskeligt at udvide 
+søgemulighederne i Slægtsbiblioteket med en AI drevet semantisk søgning. 
 
-## Problemer
-Der er p.t. nogle udfordringer:
-1. Søgninger i bøgerne giver totalt ubrugelige/forkerte resultater. Jeg ved ikke hvorfor, men har 2 teser og forfølge:
-    1. Opdelingen af teksten i chunks er nok ikke optimal
-    2. Dokumenternes digitale tekst er for mange dokumenters vedkommende ikke optimal. Der er mellemrum sat ind i ord, der er mærkelige linjeskift osv.
-2. Det tog absurd lang tid at lave embeddings, ca. 2,5 døgn. Det er kaldene til OpenAI, der tager tid. Det er en teknisk ting, som nok kan løses. 
+## Forudsætninger
+- Python v. 3.12.4 
+- Postgresql server
+- OpenAI nøgle (sættes i environment fil)
 
 ## Overblik over filer
 
