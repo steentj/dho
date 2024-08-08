@@ -67,14 +67,14 @@ class SearchEngine:
         else:
             distance_operator = "<->"
 
-        print("distance_operator:", distance_operator)
-        print("chunk_size:", tabel)
+        # print("distance_operator:", distance_operator)
+        # print("chunk_size:", tabel)
 
         sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding {distance_operator} %s AS distance " \
         f"FROM books b inner join {tabel} c on b.id = c.book_id " \
         f"WHERE length(trim(c.chunk)) > 20 " \
         f"ORDER BY embedding {distance_operator} %s ASC LIMIT 5"
-        print(sql)
+        # print(sql)
         cur.execute(sql, (str(vektor),str(vektor)),)
 
         results = cur.fetchall()

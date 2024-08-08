@@ -13,16 +13,16 @@ Start-Process ".\Docker Desktop Installer.exe" -Wait -NoNewWindow "install --qui
 Start-Process "Docker Desktop.exe"
 
 # 4. Hent Docker-image til PostgreSQL med pgvector
-docker pull ankane/pgvector:latest
+# docker pull pgvector/pgvector:pg16
 
 # 5. Start et PostgreSQL-image
-docker run --name dhoDB -e POSTGRES_PASSWORD=mysecretpassword -d ankane/pgvector
+# docker run --name dhoDB -e POSTGRES_PASSWORD=mysecretpassword -d pgvector/pgvector:pg16
 
 # 6. Opret en database "WW2" på PostgreSQL-serveren
-docker exec -it pgDHO createdb -U postgres WW2
+# docker exec -it dhoDB createdb -U postgres WW2
 
 # 7. Installer pgvector-udvidelsen i databasen
-docker exec -it pgDHO psql -U postgres -d WW2 -c "CREATE EXTENSION IF NOT EXISTS vector"
+# docker exec -it dhoDB psql -U postgres -d WW2 -c "CREATE EXTENSION IF NOT EXISTS vector"
 
 # 8. Hent pgAdmin
 Invoke-WebRequest -Uri "https://ftp.postgresql.org/pub/pgadmin/pgadmin4/v8.10/windows/pgadmin4-8.10-x64.exe" -OutFile "PgAdminInstaller.exe"
