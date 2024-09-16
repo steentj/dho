@@ -24,9 +24,9 @@ Start-Process "Docker Desktop.exe"
 # 7. Installer pgvector-udvidelsen i databasen
 # docker exec -it dhoDB psql -U postgres -d WW2 -c "CREATE EXTENSION IF NOT EXISTS vector"
 
-# 8. Hent pgAdmin
-Invoke-WebRequest -Uri "https://ftp.postgresql.org/pub/pgadmin/pgadmin4/v8.10/windows/pgadmin4-8.10-x64.exe" -OutFile "PgAdminInstaller.exe"
+# 8. Hent pgAdmin !!! Vi kommer ikke til at køre Windows
+# Invoke-WebRequest -Uri "https://ftp.postgresql.org/pub/pgadmin/pgadmin4/v8.10/windows/pgadmin4-8.10-x64.exe" -OutFile "PgAdminInstaller.exe"
 
-# 9. Installer pgAdmin
-Start-Process "PgAdminInstaller.exe"
+# 9. Installer pgAdmin !!! Vi kommer ikke til at køre Windows
+#  "PgAdminInstaller.exe"
 

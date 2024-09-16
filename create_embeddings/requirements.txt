@@ -1,0 +1,11 @@
+psycopg2-binary
+pgvector
+python_dotenv
+requests
+pymupdf
+openai
+langchain_text_splitters
+tqdm
+flask
+uvicorn
+fastapi

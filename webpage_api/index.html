@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="da">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Danskernes Historie Online</title>
+        <link rel="stylesheet" type="text/css" href="static/styles.css">
+        <script>
+            function søg() {
+                console.log('search startet')
+                var searchText = document.getElementById('search_text').value;
+                var chunkSize = document.querySelector('input[name="chunk_size"]:checked').value;
+                var distanceFunction = document.querySelector('input[name="distance_function"]:checked').value;
+
+                var data = {
+                    query: searchText,
+                    chunk_size: chunkSize,
+                    distance_function: distanceFunction
+                };
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'http://37.27.95.230:8000/search', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                /**
+                 * Event handler for when the readystatechange event is triggered.
+                 * Updates the search results div with the response text when the request is complete.
+                 */
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        if (xhr.status === 200) {
+                            console.log('Søgning gennemført');
+                            var responseTekst = JSON.parse(xhr.responseText);
+                            var response = JSON.parse(responseTekst);
+                            var searchResultsDiv = document.getElementById('search_results');
+                            searchResultsDiv.innerHTML = '';
+
+                            console.log(typeof response);
+                            console.log(Array.isArray(response)); // Check if it's an array
+
+                            response.forEach(result => {
+                                console.log(result)
+                                var resultHtml = `
+                                    <li>
+                                    <div class="flex-container">
+                                        <div class="flex-item">Distance: ${result.distance}</div>
+                                        <div class="flex-item flex-grow">Forfatter: ${result.forfatter}</div>
+                                        <div class="flex-item flex-grow">Titel: ${result.titel}</div>
+                                        <div class="flex-item flex-grow">Side: ${result.sidenr}</div>
+                                        <div class="flex-item"><a href='${result.pdf_navn}')" target="_blank">Vis bog</a></div>
+                                    </div>
+                                    <div>
+                                        <textarea rows="5">${result.chunk}</textarea>
+                                    </div>
+                                    </li>`;
+                                searchResultsDiv.innerHTML += resultHtml;
+                            });
+                        } else {
+                            console.error('Error:', xhr.status);
+                        }
+                    }
+                };
+                xhr.send(JSON.stringify(data));
+            }
+        </script>
+    </head>
+    <body>
+        <header>
+            <div class="header-content">
+                <h1>Danskernes Historie Online</h1>
+            </div>
+        </header>
+
+        <main>
+            <section class="search-section">
+                <form>
+                    <div class="search-bar">
+                        <input id="search_text" name="search_text" type="search" placeholder="Semantisk søgning">
+                        <button type="button" onclick="søg()" name="search_button">Søg</button>
+                    </div>
+                    <br/>
+                    <br/>
+                    <div style="display: grid; grid-template-columns: auto auto;">
+                        <div>Chunk størrelse:</div>
+                        <ul style="list-style-type: none; padding: 0; margin: 0;">
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="mini"> Mini (50)</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="lille"> Lille (100)</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="medium" checked> Medium (300)</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="stor"> Stor (200)</label></li>
+                        </ul>
+                    </div>
+                    <br/>
+                    <div style="display: grid; grid-template-columns: auto auto;">
+                        <div>Lighedsfunktion:</div>
+                        <ul style="list-style-type: none; padding: 0; margin: 0;">
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="cosine" checked> Cosine</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="l1"> L1</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="l2"> L2</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="inner_product"> Inner product</label></li>
+                        </ul>
+                    </div>
+                </form>
+                <ul id="search_results">
+                    <!-- {% for result in search_results %}
+                    <li>
+                        <div class="flex-container">
+                            <div class="flex-item">Distance: {{ result.distance }}</div>
+                            <div class="flex-item flex-grow">Forfatter: {{ result.forfatter }}</div>
+                            <div class="flex-item flex-grow">Titel: {{ result.titel }}</div>
+                            <div class="flex-item flex-grow">Side: {{ result.sidenr }}</div>
+                            <div class="flex-item"><a href='{{ result.pdf_navn }}')" target="_blank">Vis bog</a></div>
+                        </div>
+                        <div>
+                            <textarea rows="5">{{ result.chunk }}</textarea>
+                        </div> -->
+                    <!-- </li>
+                    {% endfor %} -->
+                </ul>
+            </section>
+        </main>
+    </body>
+</html>

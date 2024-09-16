@@ -1,0 +1,6 @@
+psycopg[binary,pool]
+pgvector
+python_dotenv
+openai
+uvicorn
+fastapi

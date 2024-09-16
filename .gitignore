@@ -28,3 +28,5 @@ dho/
 # ignore temporary folders for pdf and markdown files
 pdf/
 markdown/
+
+*.tar
