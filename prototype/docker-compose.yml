@@ -1,0 +1,40 @@
+services:
+  nginx:
+    build: ./nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - searchapi
+    networks:
+      - dho-network
+
+  searchapi:
+    image: dhosearchapi:0.1
+    container_name: dhosearch
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    expose:
+      - "8000"
+    networks:
+      - dho-network
+    restart: always
+      
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: dhodb
+    env_file:
+      - .env
+    volumes:
+      - ${HOME}/dhoDbData:/var/lib/postgresql/data
+    expose:
+      - "5433"
+    networks:
+      - dho-network
+    restart: always
+    command: ["postgres", "-c", "shared_preload_libraries=vector"]
+
+networks:
+  dho-network:
+    driver: bridge

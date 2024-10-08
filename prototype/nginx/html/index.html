@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="da">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Danskernes Historie Online</title>
+        <link rel="stylesheet" type="text/css" href="static/styles.css">
+    </head>
+    <body>
+        <header>
+            <div class="header-content">
+                <h1>Danskernes Historie Online</h1>
+                <i style="color: orangered;">Semantisk søgning prototype</i>
+            </div>
+        </header>
+
+        <main>
+            <section class="search-section">
+                <form>
+                    <div class="search-bar">
+                        <input id="search_text" name="search_text" type="search" placeholder="Semantisk søgning">
+                        <button id="searchbutton" type="button" onclick="søg()" name="search_button">Søg</button>
+                    </div>
+                    <br/>
+                    <br/>
+                    <div style="display: grid; grid-template-columns: auto auto;">
+                        <div>Chunk størrelse:</div>
+                        <ul style="list-style-type: none; padding: 0; margin: 0;">
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="mini"> Mini (50)</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="lille"> Lille (100)</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="medium" checked> Medium (300)</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="stor"> Stor (500)</label></li>
+                        </ul>
+                    </div>
+                    <br/>
+                    <div style="display: grid; grid-template-columns: auto auto;">
+                        <div>Lighedsfunktion:</div>
+                        <ul style="list-style-type: none; padding: 0; margin: 0;">
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="cosine" checked>Cosine</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="l1">L1</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="l2">L2</label></li>
+                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="inner_product">Inner product</label></li>
+                        </ul>
+                    </div>
+                </form>
+                <ul id="search_results">
+                </ul>
+            </section>
+        </main>
+        <script>
+            // Lyt efter keydown event og tjek om tasten er Enter (keyCode 13)
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.keyCode === 13) {
+                    event.preventDefault();
+                }
+            });
+
+            function søg() {
+                // Tjek om der er indtastet noget i input-feltet
+                if (!document.getElementById('search_text').value) {
+                    alert("Ingen indtastning i input-feltet. Prøv igen.");
+                    return;
+                }
+                var searchText = document.getElementById('search_text').value;
+                var chunkSize = document.querySelector('input[name="chunk_size"]:checked').value;
+                var distanceFunction = document.querySelector('input[name="distance_function"]:checked').value;
+
+                var data = {
+                    query: searchText,
+                    chunk_size: chunkSize,
+                    distance_function: distanceFunction
+                };
+                console.log(`Parametre: ###${searchText}###${chunkSize}###${distanceFunction}###`);
+
+                fetch('http://localhost:8080/search/', {  // Ensure the URL matches the Nginx config
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // Hvis svaret ikke er OK (status kode ikke i området 200-299)
+                        console.error('Fejlstatus:', response.status, response.statusText);
+                        throw new Error('HTTP-fejlstatus: ' + response.status);
+                    }
+                    // Log hele response-objektet for at kontrollere, hvad der returneres
+                    console.log('Raw response:', response);
+                    // Konverter svaret til JSON, men tjek at det er vellykket
+                    return response.json();
+                })
+                .then(responseData => {
+                    resultater = JSON.parse(responseData);
+                    console.log('Parsed response data:', responseData);
+
+                    // Tjek om responseData faktisk er en array
+                    if (Array.isArray(resultater)) {
+                        console.log('Søgning gennemført');
+                        var searchResultsDiv = document.getElementById('search_results');
+                        searchResultsDiv.innerHTML = '';  // Ryd gamle resultater
+
+                        resultater.forEach(result => {
+                            var resultHtml = `
+                                <li>
+                                <div class="flex-container">
+                                    <div class="flex-item">Distance: ${result.distance}</div>
+                                    <div class="flex-item flex-grow">Forfatter: ${result.forfatter}</div>
+                                    <div class="flex-item flex-grow">Titel: ${result.titel}</div>
+                                    <div class="flex-item flex-grow">Side: ${result.sidenr}</div>
+                                    <div class="flex-item"><a href='${result.pdf_navn}' target="_blank">Vis bog</a></div>
+                                </div>
+                                <div>
+                                    <textarea rows="5">${result.chunk}</textarea>
+                                </div>
+                                </li>`;
+                            searchResultsDiv.innerHTML += resultHtml;
+                        });
+                    } else {
+                        console.error('Response is not an array:', responseData);
+                    }
+                })
+                .catch(error => {
+                    console.error('Fejl status fra kald til dhosearch:', error);
+                });
+            }
+
+        </script>
+    </body>
+</html>

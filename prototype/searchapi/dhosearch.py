@@ -36,12 +36,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Allow CORS for all origins (for testing purposes). You can specify more secure settings later.
-allow_origins = os.getenv("TILLADTE_KALDERE", None)
+tilladte_oprindelse_urler = os.getenv("TILLADTE_KALDERE", None).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[allow_origins],  # Kan specificeres til specifikke URL'er for mere sikkerhed
+    allow_origins=[url for url in tilladte_oprindelse_urler if url],  # Kan specificeres til specifikke URL'er for mere sikkerhed
     allow_credentials=True,
-    allow_methods=["GET", "POST"],  # Tillader alle HTTP-metoder (GET, POST osv.)
+    allow_methods=["*"],  # Tillader alle HTTP-metoder (GET, POST osv.)
     allow_headers=["*"],  # Tillader alle headers
 )
 
@@ -56,7 +56,7 @@ async def rod_side():
     return({"Hej": "Dette er Dansk Historie Online: Semantisk søgning API - prototype"})
 
 @app.post("/search")
-async def get_results(request: Input):
+async def search(request: Input):
     print(f'Søger efter "{request.query}"...')
     load_dotenv()
     openai_key = os.getenv("OPENAI_API_KEY", None)
