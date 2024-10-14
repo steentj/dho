@@ -23,25 +23,27 @@
                     </div>
                     <br/>
                     <br/>
-                    <div style="display: grid; grid-template-columns: auto auto;">
-                        <div>Chunk størrelse:</div>
-                        <ul style="list-style-type: none; padding: 0; margin: 0;">
-                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="mini"> Mini (50)</label></li>
-                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="lille"> Lille (100)</label></li>
-                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="medium" checked> Medium (300)</label></li>
-                            <li style="display: inline;"><label><input type="radio" name="chunk_size" value="stor"> Stor (500)</label></li>
-                        </ul>
+                    <div style="display: flex; align-items: center; margin-left: 40px">
+                        Chunk størrelse:
+                        <label style="margin-left: 10px; margin-right: 20px;"><input type="radio" name="chunk_size" value="mini"> Mini (50)</label>
+                        <label style="margin-left: 10px; margin-right: 20px;"><input type="radio" name="chunk_size" value="lille"> Lille (100)</label>
+                        <label style="margin-left: 10px; margin-right: 20px;"><input type="radio" name="chunk_size" value="medium" checked> Medium (300)</label>
+                        <label style="margin-left: 10px; margin-right: 20px;"><input type="radio" name="chunk_size" value="stor"> Stor (500)</label>
+                        <button style="border: none; background-color: transparent; vertical-align: middle;" type="button" onclick="alert('Vælg mellem størrelsen af den tekstbid fra bogen, som søgningen sammenlignes mod. Bemærk at det er ikke en ord for ord sammenligning men en sammenligning af søgningens mening og tekstbiddens mening.')">
+                            <img src="infoikon.png" width="20" height="20" style="vertical-align: middle;">
+                        </button>
                     </div>
-                    <br/>
-                    <div style="display: grid; grid-template-columns: auto auto;">
-                        <div>Lighedsfunktion:</div>
-                        <ul style="list-style-type: none; padding: 0; margin: 0;">
-                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="cosine" checked>Cosine</label></li>
-                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="l1">L1</label></li>
-                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="l2">L2</label></li>
-                            <li style="display: inline;"><label><input type="radio" name="distance_function" value="inner_product">Inner product</label></li>
-                        </ul>
-                    </div>
+                    <br/>                    
+                    <div style="display: flex; align-items: center; margin-left: 40px;">
+                        Lighedsfunktion: 
+                        <label style="margin-left: 10px; margin-right: 20px;"><input type="radio" name="distance_function" value="cosine" checked>Cosine</label>
+                        <label style="margin-right: 20px;"><input type="radio" name="distance_function" value="l1">L1</label>
+                        <label style="margin-right: 20px;"><input type="radio" name="distance_function" value="l2">L2</label>
+                        <label style="margin-right: 20px;"><input type="radio" name="distance_function" value="inner_product">Inner product</label>
+                        <button style="border: none; background-color: transparent; vertical-align: middle;" type="button" onclick="alert('Lighedsfunktion refererer til den matematiske funktion, der bruges til at regne sammenhæng mellem søgning og tekstbid.')">
+                            <img src="infoikon.png" width="20" height="20" style="vertical-align: middle;">
+                        </button>
+                    </div> 
                 </form>
                 <ul id="search_results">
                 </ul>
@@ -72,7 +74,8 @@
                 };
                 console.log(`Parametre: ###${searchText}###${chunkSize}###${distanceFunction}###`);
 
-                fetch('http://localhost:8080/search/', {  // Ensure the URL matches the Nginx config
+                var url = document.location.origin + '/search/';  // Use the current page's origin as the base URL
+                fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -85,14 +88,10 @@
                         console.error('Fejlstatus:', response.status, response.statusText);
                         throw new Error('HTTP-fejlstatus: ' + response.status);
                     }
-                    // Log hele response-objektet for at kontrollere, hvad der returneres
-                    console.log('Raw response:', response);
-                    // Konverter svaret til JSON, men tjek at det er vellykket
                     return response.json();
                 })
                 .then(responseData => {
                     resultater = JSON.parse(responseData);
-                    console.log('Parsed response data:', responseData);
 
                     // Tjek om responseData faktisk er en array
                     if (Array.isArray(resultater)) {

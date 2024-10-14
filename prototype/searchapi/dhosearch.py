@@ -2,7 +2,7 @@ from psycopg import AsyncConnection
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
@@ -34,6 +34,13 @@ async def lifespan(app: FastAPI):
     print("Luk ned: Databasen er frakoblet")
 
 app = FastAPI(lifespan=lifespan)
+
+@app.middleware("http")
+async def log_origin(request: Request, call_next):
+    origin = request.headers.get("origin")
+    print(f"Origin: {origin}")
+    response = await call_next(request)
+    return response
 
 # Allow CORS for all origins (for testing purposes). You can specify more secure settings later.
 tilladte_oprindelse_urler = os.getenv("TILLADTE_KALDERE", None).split(",")

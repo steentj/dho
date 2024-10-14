@@ -1,5 +1,5 @@
 # Semantisk søgning i Danskernes Historie Online (Slægtsbiblioteket) - Proof of Concept
-Dette repository indeholder de Python programmer, der skla bruges for at undersøge om det er muligt og ønskeligt at udvide 
+Dette repository indeholder de Python programmer, der skal bruges for at undersøge om det er muligt og ønskeligt at udvide 
 søgemulighederne i Slægtsbiblioteket med en AI drevet semantisk søgning. 
 
 Filerne er organiseret i 2 foldere:
