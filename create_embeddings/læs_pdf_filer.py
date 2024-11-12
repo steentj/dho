@@ -7,7 +7,7 @@ import psycopg2
 from tqdm import tqdm
 import re
 
-CHUNK_SIZE = 50
+CHUNK_SIZE = 500
 
 
 def get_local_pdf_files():
@@ -87,7 +87,10 @@ def extract_text_from_chunk(raw_chunk: str) -> tuple:
         str: The third part of the split raw chunk.
     """
     parts = raw_chunk.split("##")
-    text = parts[2]
+    if len(parts) > 1:
+        text = parts[2]
+    else:
+        text = parts[0]
     return text
 
 
@@ -152,9 +155,14 @@ def save_book(book, database, db_user, db_password) -> None:
         #     + "VALUES (%s, %s, %s, %s)",
         #     (book_id, sidenr, chunk_tekst, embedding),
         # )
+        # cur.execute(
+        #     "INSERT INTO chunks_tiny(book_id, sidenr, chunk, embedding) "
+        #     + "VALUES (%s, %s, %s, %s)",
+        #     (book_id, sidenr, chunk_tekst, embedding),
+        # )
 
         cur.execute(
-            "INSERT INTO chunks_tiny(book_id, sidenr, chunk, embedding) "
+            "INSERT INTO chunks_udentitel(book_id, sidenr, chunk, embedding) "
             + "VALUES (%s, %s, %s, %s)",
             (book_id, sidenr, chunk_tekst, embedding),
         )
@@ -184,7 +192,8 @@ def handle_pdf_files(get_books, database, db_user, db_password, openai_client) -
             for chunk in chunks:
                 if chunk.strip() == "":
                     continue
-                embed_text = f"##{metadata['title']}##{chunk}"
+                embed_text = f"{chunk}"
+                # embed_text = f"##{metadata['title']}##{chunk}"
                 book["chunks"].append((page_no, embed_text))
                 book["embeddings"].append(get_embedding(embed_text, openai_client))
 
