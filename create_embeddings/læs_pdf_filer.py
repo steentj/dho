@@ -7,7 +7,7 @@ import psycopg2
 from tqdm import tqdm
 import re
 
-CHUNK_SIZE = 500
+CHUNK_SIZE = 300
 
 
 def get_local_pdf_files():
@@ -139,33 +139,13 @@ def save_book(book, database, db_user, db_password) -> None:
  
     for (sidenr, chunk), embedding in zip(book["chunks"], book["embeddings"]):
         chunk_tekst = extract_text_from_chunk(chunk)
-
-        # cur.execute(
-        #     "INSERT INTO chunks_large(book_id, sidenr, chunk, embedding) "
-        #     + "VALUES (%s, %s, %s, %s)",
-        #     (book_id, sidenr, chunk_tekst, embedding),
-        # )
-        # cur.execute(
-        #     "INSERT INTO chunks_small(book_id, sidenr, chunk, embedding) "
-        #     + "VALUES (%s, %s, %s, %s)",
-        #     (book_id, sidenr, chunk_tekst, embedding),
-        # )
-        # cur.execute(
-        #     "INSERT INTO chunks(book_id, sidenr, chunk, embedding) "
-        #     + "VALUES (%s, %s, %s, %s)",
-        #     (book_id, sidenr, chunk_tekst, embedding),
-        # )
-        # cur.execute(
-        #     "INSERT INTO chunks_tiny(book_id, sidenr, chunk, embedding) "
-        #     + "VALUES (%s, %s, %s, %s)",
-        #     (book_id, sidenr, chunk_tekst, embedding),
-        # )
-
+        
         cur.execute(
-            "INSERT INTO chunks_udentitel(book_id, sidenr, chunk, embedding) "
+            "INSERT INTO chunks(book_id, sidenr, chunk, embedding) "
             + "VALUES (%s, %s, %s, %s)",
             (book_id, sidenr, chunk_tekst, embedding),
         )
+        
     cn.commit()
     cur.close()
     cn.close()
