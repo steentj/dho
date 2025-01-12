@@ -141,7 +141,7 @@ def save_book(book, database, db_user, db_password) -> None:
         chunk_tekst = extract_text_from_chunk(chunk)
         
         cur.execute(
-            "INSERT INTO chunks(book_id, sidenr, chunk, embedding) "
+            "INSERT INTO chunks (book_id, sidenr, chunk, embedding) "
             + "VALUES (%s, %s, %s, %s)",
             (book_id, sidenr, chunk_tekst, embedding),
         )

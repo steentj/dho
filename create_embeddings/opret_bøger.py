@@ -1,74 +1,96 @@
 import asyncio
+import json
 import aiohttp
-import psycopg2
-import pymupdf
+import ssl
+from aiohttp import TCPConnector
+import asyncpg  # Async PostgreSQL
+import fitz  # PyMuPDF
 from openai import AsyncOpenAI
-from tqdm import tqdm
 from dotenv import load_dotenv
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
+import logging
+from datetime import datetime
+from abc import ABC, abstractmethod
 
-CHUNK_SIZE = 300
-URL_FILE = "samlet_input.txt"
-MODEL = "text-embedding-3-small"
+# Define the EmbeddingProvider interface
+class EmbeddingProvider(ABC):
+    @abstractmethod
+    async def get_embedding(self, chunk: str) -> list:
+        pass
 
+# Implement the OpenAIEmbeddingProvider
+class OpenAIEmbeddingProvider(EmbeddingProvider):
+    def __init__(self, api_key: str):
+        self.client = AsyncOpenAI(api_key=api_key)
+        self.model = os.getenv("OPENAI_MODEL")
+
+    async def get_embedding(self, chunk: str) -> list:
+        response = await self.client.embeddings.create(input=chunk, model=self.model)
+        return response.data[0].embedding
+
+# Implement a dummy embedding provider for testing
+class DummyEmbeddingProvider(EmbeddingProvider):
+    async def get_embedding(self, chunk: str) -> list:
+        return list(i / 10000 for i in range(1536))
+
+# Create a factory for embedding providers
+class EmbeddingProviderFactory:
+    @staticmethod
+    def create_provider(provider_name: str, api_key: str) -> EmbeddingProvider:
+        if provider_name == "openai":
+            return OpenAIEmbeddingProvider(api_key)
+        elif provider_name == "dummy":
+            return DummyEmbeddingProvider()
+        else:
+            raise ValueError(f"Unknown provider: {provider_name}")
 
 def indlæs_urls(file_path):
+    """Læs URL'er fra filen."""
     with open(file_path, "r") as file:
         return [line.strip() for line in file]
 
 
-async def fetch_pdf(url, session) -> pymupdf.Document:
+async def fetch_pdf(url, session) -> fitz.Document:
+    """Hent en PDF fra en URL."""
     try:
-        async with session.get(url) as response:
+        async with session.get(url, timeout=30) as response:
             if response.status == 200:
                 raw_pdf = await response.read()
-                return pymupdf.open("pdf", raw_pdf.content)
+                # Retter åbningsmetoden for PyMuPDF
+                return fitz.open(stream=raw_pdf, filetype="pdf")
             else:
-                print(f"Fejl ved hentning af {url}: Statuskode {response.status}")
+                logging.error(
+                    f"Fejl ved hentning af {url}: Statuskode {response.status}"
+                )
                 return None
     except aiohttp.ClientError as e:
-        print(f"Netværksfejl ved hentning af {url}: {e}")
+        logging.exception(f"Netværksfejl ved hentning af {url}: {e}")
         return None
 
 
 def extract_text_by_page(pdf) -> dict:
+    """Udtræk tekst fra hver side i PDF'en."""
     pages_text = {}
-    page_num = 1
-    for page in pdf[1:]:
-        text = page.get_text()
-        pages_text[page_num] = (
-            text.replace(
-                " \xad\n", ""
-            )  # \xad = blødt mellemrum/linjeskift ( '-' er skjult hvis ikke linjeskift)
+    for page_num in range(len(pdf)):
+        text = pdf[page_num].get_text()
+        # Rens tekst for bløde linjeskift mv.
+        pages_text[page_num + 1] = (
+            text.replace(" \xad\n", "")
             .replace("\xad\n", "")
-            .replace(
-                "-\n", ""
-            )  # '-' = hårdt mellemrum/linjeskift ( '-' er altid synlig)
+            .replace("-\n", "")
             .replace("- \n", "")
         )
-        page_num += 1
     return pages_text
 
 
-def clean_text(text) -> str:
-    text = (
-        text.replace("..", ".")
-        .replace("  ", " ")
-        .replace(" \xad", " ")
-        .replace("- \n", "")
-        .replace("-\n", "")
-        .replace("\n", "")
-        .strip()
-    )
-    return text
-
-
-def chunk_text(text, max_tokens=CHUNK_SIZE):
-    text = clean_text(text)
-    # Split text into sentences based on punctuation followed by a space
-    sentences = re.split(r"(?<=[.!?]) +", text)
+def chunk_text(text, max_tokens):
+    """Opdel teksten i chunks på maksimalt `max_tokens` ord."""
+    # Fjern ekstra mellemrum og linjeskift
+    text = re.sub(r"\s+", " ", text.strip())
+    sentences = re.split(
+        r"(?<=[.!?]) +", text
+    )  # Split tekst ved slutningen af sætninger
     current_chunk = []
     current_length = 0
 
@@ -86,130 +108,184 @@ def chunk_text(text, max_tokens=CHUNK_SIZE):
         yield " ".join(current_chunk)
 
 
-def extract_text_from_chunk(raw_chunk: str) -> tuple:
-    """
-    Fjerner bogtitlen fra den chunktekst der er lavet embedding af
-
-    Parameters:
-        raw_chunk (str): The raw chunk of text to be split.
-
-    Returns:
-        str: The third part of the split raw chunk.
-    """
-    parts = raw_chunk.split("##")
-    if len(parts) > 1:
-        text = parts[2]
-    else:
-        text = parts[0]
-    return text
-
-
-async def get_embedding(chunk, client, model=MODEL):
-    data = await client.embeddings.create(input=chunk, model=model).data
-    return data[0].embedding
+# async def get_embedding(chunk, openai_client, model=MODEL):
+#     """Generer embedding for en tekst-chunk."""
+#     response = await openai_client.embeddings.create(input=chunk, model=model)
+#     return response.data[0].embedding
     # return list(i / 10000 for i in range(1536))
 
+async def safe_db_execute(url, conn, query, *params):
+    """Wrapper til at udføre databaseforespørgsler med fejlbehandling."""
+    try:
+        return await conn.fetchval(query, *params)
+    except Exception as e:
+        logging.exception(f"Databasefejl ved query '{query}' for {url}: {e}")
+        return None
 
-async def save_book(book, database, db_user, db_password) -> None:
-    async with await psycopg2.AsyncConnection.connect(
-        host="localhost",
-        database=database,
-        user=db_user,
-        password=db_password,
-    ) as conn:
-        async with conn.cursor() as cur:
-            like_pattern = f"%{book['pdf-url']}"
-            await cur.execute(
-                "SELECT id FROM books where pdf_navn like %s", (like_pattern,)
+
+async def save_book(book, conn):
+    """Gem bogens metadata, tekst og embeddings i databasen."""
+    try:
+        async with conn.transaction():
+            # Indsæt metadata om bogen
+            result = await safe_db_execute(
+                book["pdf-url"],
+                conn,
+                """
+                INSERT INTO books (pdf_navn, titel, forfatter, antal_sider)
+                VALUES ($1, $2, $3, $4) RETURNING id
+                """,
+                book["pdf-url"],
+                book["titel"],
+                book["forfatter"],
+                book["sider"],
             )
+            book_id = result
 
-            if cur.rowcount == 0:
-                print(f"Ny bog oprettet: {book["pdf-url"]} {book["titel"]}")
-                await cur.execute(
-                    "INSERT INTO books(pdf_navn, titel, forfatter, antal_sider) "
-                    + "VALUES (%s, %s, %s, %s) RETURNING id",
-                    (book["pdf-url"], book["titel"], book["forfatter"], book["sider"]),
+            # Indsæt tekst-chunks og embeddings
+            for (page_num, chunk_text), embedding in zip(
+                book["chunks"], book["embeddings"]
+            ):
+                await safe_db_execute(
+                    book["pdf-url"],
+                    conn,
+                    """
+                    INSERT INTO chunks (book_id, sidenr, chunk, embedding)
+                    VALUES ($1, $2, $3, $4)
+                    """,
+                    book_id,
+                    page_num,
+                    chunk_text,
+                    json.dumps(embedding),
                 )
+    except Exception as e:
+        logging.exception(
+            f"Fejl ved indsættelse af bog {book['pdf-url']} i databasen: {e}"
+        )
+        raise
 
-            book_id = await cur.fetchone()[0]
+async def parse_book(pdf, book_url, chunk_size, embedding_provider):
+    """Udtræk tekst fra PDF, opdel i chunks, generer embeddings."""
+    try:
+        metadata = pdf.metadata or {}  # Håndter manglende metadata
+        book = {
+            "pdf-url": book_url,
+            "titel": metadata.get("title", "Ukendt Titel"),
+            "forfatter": metadata.get("author", "Ukendt Forfatter"),
+            "sider": len(pdf),
+            "chunks": [],
+            "embeddings": [],
+        }
 
-            for (sidenr, chunk), embedding in zip(book["chunks"], book["embeddings"]):
-                chunk_tekst = extract_text_from_chunk(chunk)
+        pdf_pages = extract_text_by_page(pdf)
 
-                await cur.execute(
-                    "INSERT INTO chunks(book_id, sidenr, chunk, embedding) "
-                    + "VALUES (%s, %s, %s, %s)",
-                    (book_id, sidenr, chunk_tekst, embedding),
+        for page_num, page_text in pdf_pages.items():
+            for chunk in chunk_text(page_text, chunk_size):
+                if chunk.strip():  # Ignorer tomme chunks
+                    chunk_with_metadata = f"##{book['titel']}##{chunk}"
+                    book["chunks"].append((page_num, chunk_with_metadata))
+                    embedding = await embedding_provider.get_embedding(chunk_with_metadata)
+                    book["embeddings"].append(embedding)
+    finally:
+        pdf.close()  # Luk PDF for at frigøre ressourcer
+
+    return book
+
+
+async def process_book(book_url, chunk_size, pool, session, embedding_provider):
+    """Behandl en enkelt bog fra URL til database."""
+    pdf = await fetch_pdf(book_url, session)
+
+    if pdf:
+        try:
+            async with pool.acquire() as conn:
+                # Check om bogen allerede findes i databasen
+                result = await safe_db_execute(
+                    book_url,
+                    conn,
+                    "SELECT id FROM books WHERE pdf_navn = $1",
+                    book_url,
                 )
-
-            await conn.commit()
-            await cur.close()
-            await conn.close()
-
-
-async def parse_book(pdf, book_url, session, api_key):
-    # hent tekst fra pdf, chunk, generer embeddings og gem i db
-    metadata = pdf.metadata
-    book = {
-        "pdf-url": book_url,
-        "titel": metadata["title"],
-        "forfatter": metadata["author"],
-        "sider": len(pdf),
-        "chunks": [],
-        "embeddings": [],
-    }
-
-    pdf_pages = extract_text_by_page(pdf)
-    openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", None))
-
-    for page_num, page_text in tqdm(pdf_pages.items(), desc=f"Chunking"):
-        chunks = chunk_text(page_text)
-        for chunk in chunks:
-            if chunk.strip() == "":
-                continue
-            # embed_text = f"{chunk}"
-            embed_text = f"##{metadata['title']}##{chunk}"
-            book["chunks"].append((page_num, embed_text))
-            embedding = await get_embedding(embed_text, session, openai_client)
-            book["embeddings"].append(embedding)
-
-
-async def process_book(book_url, api_key, db_conn):
-    # henter pdf asynkront, chunker, genere embedding, gem i db
-    async with aiohttp.ClientSession() as session:
-        pdf = await fetch_pdf(book_url, session)
-        if pdf:
-            print(f"PDF filen ({book_url}) er hentet succesfuldt")
-            book = await parse_book(pdf, book_url, session, api_key)
-        else:
-            print(f"Kunne ikke hente PDF-filen. Url: {book_url}")
-
-        await save_book(book, database, db_user, db_password)
+                if not result:
+                    book = await parse_book(pdf, book_url, chunk_size, embedding_provider)
+                    await save_book(book, conn)
+                    logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
+                else:
+                    logging.info(f"Bogen {book_url} er allerede i databasen")
+        except Exception as e:
+            logging.exception(f"Fejl ved behandling af {book_url}: {e}")
+    else:
+        logging.warning(f"Kunne ikke hente PDF fra {book_url}")
 
 
 async def main():
-    load_dotenv()
-    global database, db_user, db_password
-    database = os.getenv("POSTGRES_DB", None)
-    db_user = os.getenv("POSTGRES_USER", None)
-    db_password = os.getenv("POSTGRES_PASSWORD", None)
+    """Hovedfunktion for at hente og behandle alle bøger."""
+    load_dotenv(override=True)
+    database = os.getenv("POSTGRES_DB")
+    db_user = os.getenv("POSTGRES_USER")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    api_key = os.getenv("OPENAI_API_KEY")
+    provider = os.getenv("PROVIDER")
+    chunk_size = int(os.getenv("CHUNK_SIZE"))
+    url_file = os.getenv("URL_FILE")
+    
+    embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
 
-    api_key = os.getenv("OPENAI_API_KEY", None)
-    book_urls = indlæs_urls(URL_FILE)
+    # Konfigurer logging
+    logging.basicConfig(
+        level=logging.INFO,  # Logniveau
+        format="%(asctime)s - %(levelname)s - %(message)s",  # Logformat
+        handlers=[
+            logging.FileHandler(
+                f"opret_bøger_{datetime.now():%Y-%m-%d_%H-%M-%S}.log", encoding="utf-8"
+            ),  # Log til fil
+            logging.StreamHandler(),  # Log til konsol (valgfrit)
+        ],
+    )
+    # Undertryk info logs fra openai og aiohttp loggere
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
-    async with aiohttp.ClientSession() as session:
-        with psycopg2.connect(
-            host="localhost",
-            database=database,
-            user=db_user,
-            password=db_password,
-        ) as conn:
-            with ThreadPoolExecutor(max_workers=10) as executor:  # juster max_workers
-                tasks = [
-                    process_book(url, api_key, conn, session, executor)
-                    for url in book_urls
-                ]
-                await asyncio.gather(*tasks)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    url_file_path = os.path.join(script_dir, url_file)
+    book_urls = indlæs_urls(url_file_path)
+
+    # Opret asynkrone forbindelser
+    try:
+        async with asyncpg.create_pool(
+            host="localhost", database=database, user=db_user, password=db_password
+        ) as pool:
+            try:
+                ssl_context = ssl.create_default_context()
+                async with aiohttp.ClientSession(
+                    connector=TCPConnector(ssl=ssl_context)
+                ) as session:
+                    # Begræns antal samtidige opgaver
+                    semaphore = asyncio.Semaphore(5)
+                    tasks = [
+                        asyncio.create_task(
+                            semaphore_guard(
+                                process_book, semaphore, url, chunk_size, pool, session, embedding_provider
+                            )
+                        )
+                        for url in book_urls
+                    ]
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            finally:
+                try:
+                    await asyncio.wait_for(pool.close(), timeout=60)
+                except asyncio.TimeoutError:
+                    logging.warning(
+                        "Poolen lukkede ikke inden for timeout-perioden (60 sekunder)"
+                    )
+    except Exception as e:
+        logging.exception(f"Fatal fejl i hovedprogrammet: {e}")
+
+
+async def semaphore_guard(coro, semaphore, *args):
+    """Hjælpefunktion til at begrænse samtidige opgaver."""
+    async with semaphore:
+        await coro(*args)
 
 
 if __name__ == "__main__":
