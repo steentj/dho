@@ -72,7 +72,7 @@ async def search(request: Input):
 
     vektor = get_embedding(request.query, client)
 
-    resultater = await find_nærmeste(vektor, request.chunk_size, request.distance_function)
+    resultater = await find_nærmeste(vektor)
 
     # We take the list of results from the database, and transform each
     # result into a dictionary with the columns as keys and the values
@@ -102,22 +102,8 @@ async def search(request: Input):
     
     return json.dumps(dokumenter)
 
-async def find_nærmeste(vektor: list, chunk_size: str, distance_function: str, ) -> list:
-    # host = os.getenv("POSTGRES_HOST", None)
-    # host_port = os.getenv("POSTGRES_PORT", None)
-    # database = os.getenv("POSTGRES_DB", None)
-    # db_user = os.getenv("POSTGRES_USER", None)
-    # db_password = os.getenv("POSTGRES_PASSWORD", None)
-
-    # with psycopg2.connect(
-    #     host=host,
-    #     database=database,
-    #     user=db_user,
-    #     password=db_password,
-    #     port=host_port
-    # ) as cn:
+async def find_nærmeste(vektor: list,) -> list:
     try:
-        # async with db_conn.connection() as cn:
         async with db_conn.cursor() as cur:
 
                 # Supported distance functions are:
@@ -126,25 +112,9 @@ async def find_nærmeste(vektor: list, chunk_size: str, distance_function: str, 
                 #     <=> - cosine distance
                 #     <+> - L1 distance (Manhattan)
                 
-                tabel = ""
-                if chunk_size == ChunkSize.stor:
-                    tabel = "chunks_large"
-                elif chunk_size == ChunkSize.lille:
-                    tabel = "chunks_small"
-                elif chunk_size == ChunkSize.mini:
-                    tabel = "chunks_tiny"
-                else:
-                    tabel = "chunks"
+                tabel = "chunks"
 
-                distance_operator = ""
-                if distance_function == DistanceFunction.cosine:
-                    distance_operator = "<=>"
-                elif distance_function == DistanceFunction.l1:
-                    distance_operator = "<+>"
-                elif distance_function == DistanceFunction.inner_product:
-                    distance_operator = "<#>"
-                else:
-                    distance_operator = "<->"
+                distance_operator = "<=>"
 
                 sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding {distance_operator} %s AS distance " \
                 f"FROM books b inner join {tabel} c on b.id = c.book_id " \
@@ -154,9 +124,7 @@ async def find_nærmeste(vektor: list, chunk_size: str, distance_function: str, 
                 await cur.execute(sql, (str(vektor),str(vektor)),)
 
                 results = await cur.fetchall()
-
-                # cur.close()
-                # cn.close()
+                
     except Exception as e:
         print(f"Fejl ved indlæsning af databasen: {e}")
         results = []
