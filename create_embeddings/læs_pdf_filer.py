@@ -76,7 +76,7 @@ def get_embedding(texts, client, model="text-embedding-3-small"):
     # return list(i / 10000 for i in range(1536))
 
 
-def extract_text_from_chunk(raw_chunk: str) -> tuple:
+def extract_text_from_chunk(raw_chunk: str):
     """
     Fjerner bogtitlen fra den chunktekst der er lavet embedding af
 

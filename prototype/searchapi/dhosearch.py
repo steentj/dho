@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 import json
 from enum import Enum
@@ -36,9 +37,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 @app.middleware("http")
-async def log_origin(request: Request, call_next):
+async def log_origin_and_enforce_https(request: Request, call_next):
+    # Log origin-headeren
     origin = request.headers.get("origin")
     print(f"Origin: {origin}")
+    
+    # Håndhæv HTTPS
+    if request.url.scheme != "https":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="HTTPS is required")
+    
+    # Fortsæt med næste middleware eller endpoint
     response = await call_next(request)
     return response
 
@@ -97,7 +106,8 @@ async def search(request: Input):
             if dokument["forfatter"] == "None" and "" or dokument["forfatter"]
             else "Ukendt"
         )
-        dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"] + 1)}'
+        dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"])}'
+        dokument["chunk"] = extract_text_from_chunk(dokument["chunk"]) # Fjerner bogtitlen fra chunken
         print(f"{dokument["titel"]} side: {dokument['sidenr']}")
     
     return json.dumps(dokumenter)
@@ -137,6 +147,23 @@ def get_embedding(text, client, model="text-embedding-3-small"):
         client.embeddings.create(input=[text], model=model).data[0].embedding
     )
     return embeddings
+
+def extract_text_from_chunk(raw_chunk: str):
+    """
+    Fjerner bogtitlen fra den chunktekst der er lavet embedding af
+
+    Parameters:
+        raw_chunk (str): The raw chunk of text to be split.
+
+    Returns:
+        str: The third part of the split raw chunk.
+    """
+    parts = raw_chunk.split("##")
+    if len(parts) > 1:
+        text = parts[2]
+    else:
+        text = parts[0]
+    return text
 
 
 if __name__ == "__main__":
