@@ -41,12 +41,7 @@ async def log_origin_and_enforce_https(request: Request, call_next):
     # Log origin-headeren
     origin = request.headers.get("origin")
     print(f"Origin: {origin}")
-    
-    # Håndhæv HTTPS
-    if request.url.scheme != "https":
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="HTTPS is required")
-    
+     
     # Fortsæt med næste middleware eller endpoint
     response = await call_next(request)
     return response
