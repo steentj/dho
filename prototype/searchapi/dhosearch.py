@@ -98,8 +98,8 @@ async def search(request: Input):
         dokument["chunk"] = dokument["chunk"].replace("\n", " ")
         dokument["forfatter"] = (
             dokument["forfatter"]
-            if dokument["forfatter"] == "None" and "" or dokument["forfatter"]
-            else "Ukendt"
+            if dokument["forfatter"] == "None" or dokument["forfatter"]
+            else ""
         )
         dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"])}'
         dokument["chunk"] = extract_text_from_chunk(dokument["chunk"]) # Fjerner bogtitlen fra chunken

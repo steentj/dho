@@ -17,7 +17,7 @@ services:
     restart: always 
 
   searchapi:
-    image: dhosearchapi:0.2
+    image: dhosearchapi:0.3
     container_name: dhosearch
     env_file:
       - .env
