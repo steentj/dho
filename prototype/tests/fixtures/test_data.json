@@ -1,0 +1,54 @@
+{
+  "sample_book": {
+    "url": "http://example.com/test_book.pdf",
+    "pdf_navn": "test_book.pdf",
+    "titel": "Test Bog om Dansk Historie",
+    "forfatter": "Test Forfatter",
+    "pages": {
+      "1": "Dette er den første side af test bogen. Den handler om Anna Krogh, som var en pioner inden for kvindelig gymnastik i Danmark. Hun blev uddannet i 1909 til delingsfører hos Olaf Schrøder i Odense.",
+      "2": "Anden side beskriver Niels Rolsted, som blev ansat som skovfoged i Fledskov i Ugerløse sogn i 1798. Han boede der i mange år og blev senere udnævnt til skovrider af baron Carl Severin Herman Løvenskjold.",
+      "3": "Tredje side handler om højskoler og deres betydning for dansk uddannelse. Mange betydningsfulde personer har været tilknyttet højskolebevægelsen gennem årene."
+    },
+    "expected_chunks": [
+      "Dette er den første side af test bogen. Den handler om Anna Krogh, som var en pioner inden for kvindelig gymnastik i Danmark.",
+      "Hun blev uddannet i 1909 til delingsfører hos Olaf Schrøder i Odense.",
+      "Anden side beskriver Niels Rolsted, som blev ansat som skovfoged i Fledskov i Ugerløse sogn i 1798.",
+      "Han boede der i mange år og blev senere udnævnt til skovrider af baron Carl Severin Herman Løvenskjold.",
+      "Tredje side handler om højskoler og deres betydning for dansk uddannelse.",
+      "Mange betydningsfulde personer har været tilknyttet højskolebevægelsen gennem årene."
+    ]
+  },
+  "sample_embeddings": {
+    "anna_krogh": [0.1, 0.2, 0.3, 0.4, 0.5],
+    "niels_rolsted": [0.2, 0.3, 0.4, 0.5, 0.6],
+    "højskoler": [0.3, 0.4, 0.5, 0.6, 0.7]
+  },
+  "search_queries": {
+    "gymnastik": {
+      "query": "kvindelig gymnastik",
+      "expected_results": [
+        {
+          "pdf_navn": "test_book.pdf",
+          "titel": "Test Bog om Dansk Historie",
+          "forfatter": "Test Forfatter",
+          "sidenr": 1,
+          "chunk": "Dette er den første side af test bogen. Den handler om Anna Krogh, som var en pioner inden for kvindelig gymnastik i Danmark.",
+          "distance": 0.15
+        }
+      ]
+    },
+    "skov": {
+      "query": "skovfoged arbejde",
+      "expected_results": [
+        {
+          "pdf_navn": "test_book.pdf",
+          "titel": "Test Bog om Dansk Historie", 
+          "forfatter": "Test Forfatter",
+          "sidenr": 2,
+          "chunk": "Anden side beskriver Niels Rolsted, som blev ansat som skovfoged i Fledskov i Ugerløse sogn i 1798.",
+          "distance": 0.18
+        }
+      ]
+    }
+  }
+}

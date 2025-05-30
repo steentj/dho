@@ -9,7 +9,7 @@
 
 ## In Progress
 
-- None
+- [ ] [3] Create unit and integration tests (Active - Plan ready)
 
 ## Done
 
