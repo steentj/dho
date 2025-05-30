@@ -10,6 +10,9 @@ import json
 from enum import Enum
 from contextlib import asynccontextmanager
 
+# Load environment variables first
+load_dotenv()
+
 class ChunkSize(str, Enum):
     mini = "mini"
     lille = "lille"
@@ -69,7 +72,6 @@ async def rod_side():
 @app.post("/search")
 async def search(request: Input):
     print(f'Søger efter "{request.query}"...')
-    load_dotenv()
     openai_key = os.getenv("OPENAI_API_KEY", None)
     client = OpenAI()
     client.api_key = openai_key
