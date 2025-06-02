@@ -1,12 +1,20 @@
 **Title:** Update Search Response URLs (remove page number in user-facing links)
 
 **Description:**
-Update the search API and frontend so that the URLs shown to users do not include the `#page={sidenr}` fragment, but keep the page number in the backend/database for internal use.
+Update the search API and frontend so that the URLs shown to users do not include the `#page={sidenr}` fragment, but keep the page number in the backend/database for internal use. 
+
+When not showing the page numbers it becomes necessary that if there are more than one search result from the same book the results (chunks) are concatenated in one text string. The individual test chunks found for same book must be clearly separated in the search result. 
+
+As it is now only 5 search results are returned. It should be changed to return all search results with a distance less than a specified number. This number must be read from the environment file. Initially it must be set to 0.5.
 
 **Tasks:**
+- Update new parameter in the environment file
+- Change the SQL querying the database
+- Update the response to collect all results from the same book in one result. 
 - Update backend to provide both full and user-facing URLs.
 - Update frontend to display only the user-facing URL.
-- Test that internal logic still works with page numbers.
+- Create new unit tests and update existing unit tests with the updated behavior.
+- Create new integration tests and update existing integration tests with the updated behavior.
 
 ---
 
