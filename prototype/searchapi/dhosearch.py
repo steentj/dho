@@ -4,32 +4,26 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
+import json
+from enum import Enum
 from contextlib import asynccontextmanager
-from typing import List
 
 # Load environment variables first
 load_dotenv()
 
+class ChunkSize(str, Enum):
+    mini = "mini"
+    lille = "lille"
+    medium = "medium"
+    stor = "stor"
 
-class SearchResult(BaseModel):
-    """Response model for individual search results."""
-    pdf_navn: str  # User-facing URL without page number
-    titel: str
-    forfatter: str
-    chunk: str
-    distance: float
-    internal_url: str  # Internal URL with page number
-    pages: List[int]  # Array of page numbers
-    min_distance: float
-    chunk_count: int
-
-class SearchResponse(BaseModel):
-    """Response model for search endpoint."""
-    results: List[SearchResult]
-    
-# Alternative: use List[SearchResult] directly as response model
+class DistanceFunction(str, Enum):
+    l1 = "l1"
+    inner_product = "inner_product"
+    cosine = "cosine"
+    l2 = "l2"
 
 db_conn = None
 
@@ -67,13 +61,16 @@ app.add_middleware(
 
 class Input(BaseModel):
     query: str
+    chunk_size: ChunkSize = ChunkSize.medium
+    distance_function: DistanceFunction = DistanceFunction.cosine
+
 
 @app.get("/")
 async def rod_side():
     return({"Hej": "Dette er Dansk Historie Online: Semantisk søgning API - beta version"})
 
-@app.post("/search", response_model=List[SearchResult])
-async def search(request: Input) -> List[SearchResult]:
+@app.post("/search")
+async def search(request: Input):
     print(f'Søger efter "{request.query}"...')
     openai_key = os.getenv("OPENAI_API_KEY", None)
     client = OpenAI()
@@ -83,117 +80,37 @@ async def search(request: Input) -> List[SearchResult]:
 
     resultater = await find_nærmeste(vektor)
 
-    # Group results by book and create new response format
-    grouped_results = group_results_by_book(resultater)
-    response_data = create_response_format(grouped_results)
+    # We take the list of results from the database, and transform each
+    # result into a dictionary with the columns as keys and the values
+    # as the respective values from the result.
+    # The zip function takes two lists (the column names and the result
+    # values) and pairs each element of the first list with the element
+    # at the same index in the second list.
+    # The dict function takes this list of pairs and turns it into a
+    # dictionary.
+    # The outer list comprehension just applies this to each result in
+    # the list.
+    dokumenter = [
+        dict(zip(("pdf_navn", "titel", "forfatter", "sidenr", "chunk", "distance"), result))
+        for result in resultater
+    ]
 
-    print(f"Fundet {len(response_data)} bøger med {len(resultater)} chunks:")
-    # for item in response_data:
-    #     print(f"{item['titel']} - {item['chunk_count']} chunks på sider: {item['pages']}")
+    print(f"Fundet:")
+    for dokument in dokumenter:
+        dokument["chunk"] = dokument["chunk"].replace("\n", " ")
+        dokument["forfatter"] = (
+            dokument["forfatter"]
+            if dokument["forfatter"] == "None" or dokument["forfatter"]
+            else ""
+        )
+        dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"])}'
+        dokument["chunk"] = extract_text_from_chunk(dokument["chunk"]) # Fjerner bogtitlen fra chunken
+        print(f"{dokument["titel"]} side: {dokument['sidenr']}")
     
-    return response_data
-
-def group_results_by_book(resultater: list) -> dict:
-    """
-    Group search results by book and concatenate chunks from the same book.
-    
-    Args:
-        resultater: List of tuples from database query (pdf_navn, titel, forfatter, sidenr, chunk, distance)
-        
-    Returns:
-        Dict with book identifiers as keys and grouped result data as values
-    """
-    grouped = {}
-    
-    for result in resultater:
-        pdf_navn, titel, forfatter, sidenr, chunk, distance = result
-        
-        # Create a unique book identifier using pdf_navn (without page number)
-        book_id = pdf_navn  # This should be the base filename without page number
-        
-        if book_id not in grouped:
-            grouped[book_id] = {
-                'pdf_navn': pdf_navn,
-                'titel': titel,
-                'forfatter': forfatter if forfatter and forfatter != "None" else "",
-                'chunks': [],
-                'pages': [],
-                'distances': [],
-                'min_distance': distance
-            }
-        
-        # Add chunk data
-        grouped[book_id]['chunks'].append({
-            'chunk': chunk,
-            'sidenr': sidenr,
-            'distance': distance
-        })
-        grouped[book_id]['pages'].append(sidenr)
-        grouped[book_id]['distances'].append(distance)
-        
-        # Update minimum distance
-        if distance < grouped[book_id]['min_distance']:
-            grouped[book_id]['min_distance'] = distance
-    
-    return grouped
-
-def create_response_format(grouped_results: dict) -> list:
-    """
-    Create the new response format with grouped and concatenated results.
-    
-    Args:
-        grouped_results: Dictionary from group_results_by_book()
-        
-    Returns:
-        List of dictionaries in the new response format
-    """
-    response = []
-    
-    for book_id, book_data in grouped_results.items():
-        # Sort chunks by distance (best matches first)
-        sorted_chunks = sorted(book_data['chunks'], key=lambda x: x['distance'])
-        
-        # Concatenate chunks with separators
-        concatenated_text = []
-        for i, chunk_data in enumerate(sorted_chunks):
-            chunk_text = extract_text_from_chunk(chunk_data['chunk'].replace("\n", " "))
-            page_info = f"[Side {chunk_data['sidenr']}]"
-            concatenated_text.append(f"{page_info} {chunk_text}")
-        
-        combined_chunk = "\n\n---\n\n".join(concatenated_text)
-        
-        # Create user-facing URL (without page number) and internal URL (with page number)
-        user_facing_url = book_data['pdf_navn']  # Base filename without page number
-        internal_url = f"{book_data['pdf_navn']}#page={sorted_chunks[0]['sidenr']}"  # With page number of best match
-        
-        # Remove duplicates from pages and sort them
-        unique_pages = sorted(list(set(book_data['pages'])))
-        
-        result_item = {
-            "pdf_navn": user_facing_url,  # User-facing URL without page number
-            "titel": book_data['titel'],
-            "forfatter": book_data['forfatter'],
-            "chunk": combined_chunk,
-            "distance": book_data['min_distance'],
-            # New fields for the updated response
-            "internal_url": internal_url,  # Internal URL with page number
-            "pages": unique_pages,  # Array of page numbers
-            "min_distance": book_data['min_distance'],
-            "chunk_count": len(sorted_chunks)
-        }
-        
-        response.append(result_item)
-    
-    # Sort response by minimum distance (best matches first)
-    response.sort(key=lambda x: x['min_distance'])
-    
-    return response
+    return json.dumps(dokumenter)
 
 async def find_nærmeste(vektor: list,) -> list:
     try:
-        # Get distance threshold from environment variable
-        distance_threshold = float(os.getenv("DISTANCE_THRESHOLD", "0.5"))
-        
         async with db_conn.cursor() as cur:
 
                 # Supported distance functions are:
@@ -205,14 +122,13 @@ async def find_nærmeste(vektor: list,) -> list:
                 tabel = "chunks"
 
                 distance_operator = "<=>"
-                vektorString = str(vektor)
 
                 sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding {distance_operator} %s AS distance " \
                 f"FROM books b inner join {tabel} c on b.id = c.book_id " \
-                f"WHERE length(trim(c.chunk)) > 20 AND embedding {distance_operator} %s <= %s " \
-                f"ORDER BY embedding {distance_operator} %s ASC"
-
-                await cur.execute(sql, (vektorString, vektorString, distance_threshold, vektorString),)
+                f"WHERE length(trim(c.chunk)) > 20 " \
+                f"ORDER BY embedding {distance_operator} %s ASC LIMIT 5"
+                
+                await cur.execute(sql, (str(vektor),str(vektor)),)
 
                 results = await cur.fetchall()
                 
@@ -245,6 +161,7 @@ def extract_text_from_chunk(raw_chunk: str):
     else:
         text = parts[0]
     return text
+
 
 if __name__ == "__main__":
     import uvicorn

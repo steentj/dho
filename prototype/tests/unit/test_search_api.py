@@ -12,7 +12,9 @@ searchapi_path = Path(__file__).parent.parent.parent / "searchapi"
 sys.path.insert(0, str(searchapi_path))
 
 try:
-    from searchapi.dhosearch import (
+    from dhosearch import (
+        ChunkSize, 
+        DistanceFunction, 
         Input,
         get_embedding,
         extract_text_from_chunk,
@@ -26,6 +28,36 @@ except ImportError as e:
 
 @pytest.mark.unit
 @pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI not available")
+class TestEnums:
+    """Test the enum classes."""
+    
+    def test_chunk_size_enum(self):
+        """Test ChunkSize enum values."""
+        assert ChunkSize.mini == "mini"
+        assert ChunkSize.lille == "lille"
+        assert ChunkSize.medium == "medium"
+        assert ChunkSize.stor == "stor"
+        
+        # Test all expected values exist
+        expected_values = {"mini", "lille", "medium", "stor"}
+        actual_values = {item.value for item in ChunkSize}
+        assert actual_values == expected_values
+    
+    def test_distance_function_enum(self):
+        """Test DistanceFunction enum values."""
+        assert DistanceFunction.l1 == "l1"
+        assert DistanceFunction.inner_product == "inner_product"
+        assert DistanceFunction.cosine == "cosine"
+        assert DistanceFunction.l2 == "l2"
+        
+        # Test all expected values exist
+        expected_values = {"l1", "inner_product", "cosine", "l2"}
+        actual_values = {item.value for item in DistanceFunction}
+        assert actual_values == expected_values
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI not available")
 class TestInputModel:
     """Test the Input Pydantic model."""
     
@@ -34,7 +66,33 @@ class TestInputModel:
         input_data = Input(query="test søgning")
         
         assert input_data.query == "test søgning"
-  
+        assert input_data.chunk_size == ChunkSize.medium  # Default value
+        assert input_data.distance_function == DistanceFunction.cosine  # Default value
+    
+    def test_input_model_all_fields(self):
+        """Test Input model with all fields specified."""
+        input_data = Input(
+            query="test søgning",
+            chunk_size=ChunkSize.lille,
+            distance_function=DistanceFunction.l2
+        )
+        
+        assert input_data.query == "test søgning"
+        assert input_data.chunk_size == ChunkSize.lille
+        assert input_data.distance_function == DistanceFunction.l2
+    
+    def test_input_model_validation(self):
+        """Test Input model validation."""
+        # Valid enum values should work
+        input_data = Input(
+            query="test",
+            chunk_size="mini",
+            distance_function="l1"
+        )
+        assert input_data.chunk_size == ChunkSize.mini
+        assert input_data.distance_function == DistanceFunction.l1
+
+
 @pytest.mark.unit
 @pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI not available")
 class TestGetEmbedding:
@@ -212,6 +270,8 @@ class TestAPIEndpoints:
         
         input_obj = Input(**valid_input)
         assert input_obj.query == "test søgning"
+        assert input_obj.chunk_size == ChunkSize.lille
+        assert input_obj.distance_function == DistanceFunction.cosine
 
 
 @pytest.mark.unit
