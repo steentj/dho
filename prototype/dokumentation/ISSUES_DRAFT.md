@@ -68,3 +68,42 @@ Enable local A/B testing to compare search results with and without book titles 
 - Update local test UI to switch between embeddings.
 - Document how to run the A/B test.
 - Record user feedback/results.
+
+---
+
+**Title:** Create Simple Test GUI for API Testing
+
+**Description:**
+Create a modern, user-friendly GUI application that allows users to test the semantic search API through the nginx endpoint. The GUI should provide an intuitive interface for querying the API and displaying results in a nicely formatted way with clickable links.
+
+**Requirements:**
+- Input field for search queries at the top of the page
+- Results list displayed beneath the input field
+- Nicely formatted result presentation
+- Clickable URLs that open books in the default browser
+- Modern, clean, and easy-to-use interface design
+- Cross-platform compatibility
+
+**Technical Specifications:**
+- Create in a new appropriately named folder (e.g., `test_gui` or `api_tester`)
+- Use a suitable Python GUI framework (recommendations: Tkinter for simplicity, PyQt6/PySide6 for modern look, or Streamlit for web-based GUI)
+- Include proper error handling for API connectivity issues
+- Support for the updated API response format with grouped results
+
+**Tasks:**
+- Research and select optimal Python GUI framework
+- Design modern and intuitive user interface layout
+- Implement search query input functionality
+- Implement API communication with nginx endpoint
+- Create formatted result display with clickable links
+- Add error handling and user feedback
+- Implement link opening in default browser
+- Create comprehensive user guide in markdown format
+- Test GUI on multiple platforms (macOS, Windows, Linux)
+- Package GUI for easy distribution/installation
+
+**Deliverables:**
+- Complete GUI application in new folder
+- User guide (README.md) with installation and usage instructions
+- Requirements.txt for dependencies
+- Optional: Executable build scripts for different platforms
