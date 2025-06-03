@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from typing import List

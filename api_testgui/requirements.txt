@@ -1,2 +1,3 @@
-streamlit
-requests
+# Streamlit GUI for Semantic Search API Testing
+streamlit>=1.28.0
+requests>=2.31.0
