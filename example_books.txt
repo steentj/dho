@@ -1,0 +1,10 @@
+# Example book list for testing the book processor
+# Replace these URLs with actual PDF book URLs
+# One URL per line
+
+https://example.com/sample-book-1.pdf
+https://example.com/sample-book-2.pdf
+https://example.com/sample-book-3.pdf
+
+# Note: Replace with real URLs before processing
+# The system expects publicly accessible PDF files

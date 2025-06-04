@@ -43,6 +43,25 @@ services:
     restart: always
     command: ["postgres", "-c", "shared_preload_libraries=vector"]
 
+  book-processor:
+    build:
+      context: ../create_embeddings
+      dockerfile: Dockerfile
+    container_name: dho-book-processor
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    volumes:
+      - ./book_input:/app/input:ro
+      - ./book_output:/app/output
+      - ./book_failed:/app/failed
+    networks:
+      - dho-network
+    restart: "no"
+    profiles:
+      - book-processing
+
 networks:
   dho-network:
     driver: bridge

@@ -21,7 +21,15 @@ As it is now only 5 search results are returned. It should be changed to return 
 **Title:** Streamline Adding Books to Vector Database
 
 **Description:**
-Make it easier to add new books (from URLs) to the vector database.
+Make it easier to add new books (from URLs) to the vector database. Right now the script opret_bøger.py in the folder create_embeddings is run manually on the local development machine. The data is then moved manually to the production database.
+The process must be changed to:
+- opret_bøger script must be placed in a Docker container
+- It must be possible to start the script in the Docker container from outside the Docker container. How to do that must be determined.
+- When starting and running the script it must be able to give input in form if a file with the url's of the books to create embeddings for
+- It must be possible to monitor progress, i.e. books processed, errors etc. 
+- If the processing of a book fails, the script must continue with the next book.
+- When all books are processed, a list of failed books must be available. The list must be usable as input for a new run of the script.
+- There easy to follow user guide must be made in a markdown file. It must be able to follow the user guide without deep knowledge of the system or Docker. 
 
 **Tasks:**
 - Document the current process.
@@ -29,6 +37,7 @@ Make it easier to add new books (from URLs) to the vector database.
   - Downloading books from URLs.
   - Chunking and embedding.
   - Inserting into the database.
+- Create new tests and update existing tests (unit and integration tests)
 - Update documentation for the new workflow.
 
 ---
