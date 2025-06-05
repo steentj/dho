@@ -36,16 +36,16 @@ class BookProcessorWrapper:
         # Use shared logging configuration with the output directory
         setup_logging(log_dir=str(self.output_dir))
     
-    def update_status(self, status: str = "running"):
+    def update_status(self, status: str = "kører"):
         """Update processing status file"""
         status_data = {
             "status": status,
-            "total_books": self.total_count,
-            "processed": self.processed_count,
-            "failed": self.failed_count,
-            "last_updated": datetime.now().isoformat(),
-            "embedding_model": os.getenv("OPENAI_MODEL", "unknown"),
-            "provider": os.getenv("PROVIDER", "unknown")
+            "total_boeger": self.total_count,
+            "behandlet": self.processed_count,
+            "fejlet": self.failed_count,
+            "sidst_opdateret": datetime.now().isoformat(),
+            "embedding_model": os.getenv("OPENAI_MODEL", "ukendt"),
+            "udbyder": os.getenv("PROVIDER", "ukendt")
         }
         
         with open(self.status_file, 'w') as f:
@@ -65,7 +65,7 @@ class BookProcessorWrapper:
             # Use EXISTING process_book function unchanged
             await process_book(book_url, chunk_size, pool, session, embedding_provider)
             self.processed_count += 1
-            logging.info(f"✓ Book processed or skipped (already exists): {book_url}")
+            logging.info(f"✓ Bog behandlet eller sprunget over (findes allerede): {book_url}")
             
         except Exception as e:
             self.failed_count += 1
@@ -74,7 +74,7 @@ class BookProcessorWrapper:
                 "error": str(e),
                 "timestamp": datetime.now().isoformat()
             })
-            logging.error(f"✗ Failed to process {book_url}: {e}")
+            logging.error(f"✗ Fejl ved behandling af {book_url}: {e}")
         
         # Update status after each book
         self.update_status()
@@ -85,13 +85,13 @@ class BookProcessorWrapper:
         input_file_path = Path("/app/input") / input_file
         
         if not input_file_path.exists():
-            raise FileNotFoundError(f"Input file not found: {input_file_path}")
+            raise FileNotFoundError(f"Inputfil ikke fundet: {input_file_path}")
         
         # Use EXISTING indlæs_urls function
         book_urls = indlæs_urls(str(input_file_path))
         self.total_count = len(book_urls)
         
-        logging.info(f"Processing {self.total_count} books using existing opret_bøger logic")
+        logging.info(f"Behandler {self.total_count} bøger ved hjælp af eksisterende opret_bøger logik")
         
         # Use EXISTING environment setup
         from dotenv import load_dotenv
@@ -107,7 +107,7 @@ class BookProcessorWrapper:
         # Use EXISTING embedding provider factory
         embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
         
-        self.update_status("starting")
+        self.update_status("starter")
         
         # Use EXISTING database and session setup pattern
         import asyncpg
@@ -141,14 +141,14 @@ class BookProcessorWrapper:
                     
                     await asyncio.gather(*tasks, return_exceptions=True)
                     
-                    self.update_status("completed")
+                    self.update_status("afsluttet")
                     self.save_failed_books()
                     
-                    logging.info(f"Processing completed: {self.processed_count} successful, {self.failed_count} failed")
+                    logging.info(f"Behandling afsluttet: {self.processed_count} vellykket, {self.failed_count} fejlet")
                     
         except Exception as e:
-            logging.exception(f"Fatal error in processing: {e}")
-            self.update_status("error")
+            logging.exception(f"Fatal fejl i behandlingen: {e}")
+            self.update_status("fejl")
             raise
     
     async def semaphore_guard_with_monitoring(self, semaphore, url, chunk_size, pool, session, embedding_provider):
@@ -163,14 +163,14 @@ class BookProcessorWrapper:
         failed_file = self.failed_dir / "failed_books.json"
         
         if not failed_file.exists():
-            logging.info("No failed books file found")
+            logging.info("Ingen fejlede bøger fil fundet")
             return
         
         with open(failed_file) as f:
             failed_data = json.load(f)
         
         if not failed_data:
-            logging.info("No failed books to retry")
+            logging.info("Ingen fejlede bøger at prøve igen")
             return
         
         # Create temporary URL file for retry
@@ -185,7 +185,7 @@ class BookProcessorWrapper:
         self.processed_count = 0
         self.failed_count = 0
         
-        logging.info(f"Retrying {len(retry_urls)} failed books")
+        logging.info(f"Prøver igen med {len(retry_urls)} fejlede bøger")
         
         # Copy retry file to input directory for processing
         retry_input_file = Path("/app/input") / "retry_urls.txt"
@@ -197,10 +197,10 @@ class BookProcessorWrapper:
 def main():
     """Main entry point with argument parsing"""
     
-    parser = argparse.ArgumentParser(description='Streamlined book processor using existing opret_bøger logic')
-    parser.add_argument('--input-file', help='Input file with book URLs')
-    parser.add_argument('--retry-failed', action='store_true', help='Retry previously failed books')
-    parser.add_argument('--validate-config', action='store_true', help='Validate configuration')
+    parser = argparse.ArgumentParser(description='Strømlinet bogbehandler der bruger eksisterende opret_bøger logik')
+    parser.add_argument('--input-file', help='Inputfil med bog-URL\'er')
+    parser.add_argument('--retry-failed', action='store_true', help='Prøv fejlede bøger igen')
+    parser.add_argument('--validate-config', action='store_true', help='Valider konfiguration')
     
     args = parser.parse_args()
     
@@ -214,13 +214,13 @@ def main():
         missing = [var for var in required_vars if not os.getenv(var)]
         
         if missing:
-            print(f"Missing required environment variables: {missing}")
+            print(f"Manglende påkrævede miljøvariabler: {missing}")
             sys.exit(1)
         else:
-            print("✅ All required environment variables are set")
+            print("✅ Alle påkrævede miljøvariabler er sat")
             print(f"Embedding Model: {os.getenv('OPENAI_MODEL', 'text-embedding-ada-002')}")
-            print(f"Provider: {os.getenv('PROVIDER')}")
-            print(f"Chunk Size: {os.getenv('CHUNK_SIZE', '500')}")
+            print(f"Udbyder: {os.getenv('PROVIDER')}")
+            print(f"Chunk Størrelse: {os.getenv('CHUNK_SIZE', '500')}")
             sys.exit(0)
     
     if args.retry_failed:
@@ -228,7 +228,7 @@ def main():
     elif args.input_file:
         asyncio.run(wrapper.process_books_from_file(args.input_file))
     else:
-        print("Error: Either --input-file or --retry-failed must be specified")
+        print("Fejl: Enten --input-file eller --retry-failed skal angives")
         sys.exit(1)
 
 if __name__ == "__main__":

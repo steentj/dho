@@ -43,7 +43,7 @@ class EmbeddingProviderFactory:
         elif provider_name == "dummy":
             return DummyEmbeddingProvider()
         else:
-            raise ValueError(f"Unknown provider: {provider_name}")
+            raise ValueError(f"Ukendt udbyder: {provider_name}")
 
 def indlæs_urls(file_path):
     """Læs URL'er fra filen."""

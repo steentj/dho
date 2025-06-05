@@ -1,563 +1,563 @@
-# Book Processing User Guide
+# Brugervejledning til Bogbehandling
 
-## Docker Usage - No Container Terminal Required
+## Docker Brug - Ingen Container Terminal Påkrævet
 
-**Important**: You run everything from your **host machine terminal** - you never need to enter Docker container terminals. The system automatically handles all Docker operations for you.
+**Vigtigt**: Du kører alt fra din **værtsmaskine terminal** - du behøver aldrig at gå ind i Docker container terminaler. Systemet håndterer automatisk alle Docker operationer for dig.
 
-## Quick Start
+## Hurtig Start
 
-### Prerequisites
-1. Ensure Docker and Docker Compose are installed
-2. Navigate to the project directory:
+### Forudsætninger
+1. Sørg for at Docker og Docker Compose er installeret
+2. Naviger til projektmappen:
    ```bash
-   cd /path/to/SlægtBib/src
+   cd /sti/til/SlægtBib/src
    ```
 
-### 1. Validate Configuration
-First, ensure your environment is properly configured:
+### 1. Valider Konfiguration
+Først skal du sikre dig, at dit miljø er korrekt konfigureret:
 
 ```bash
 ./scripts/process_books.sh --validate
 ```
 
-**What happens**: This command automatically starts a temporary Docker container, validates your `.env` file, then removes the container. You stay in your host terminal the entire time.
+**Hvad sker der**: Denne kommando starter automatisk en midlertidig Docker container, validerer din `.env` fil, og fjerner derefter containeren. Du forbliver i din værtsmaskine terminal hele tiden.
 
-### 2. Create Book List  
-Create a text file **on your host machine** with one URL per line:
-
-```bash
-# Create the file anywhere on your host machine
-nano my_books.txt
-```
-
-Content format (same as existing opret_bøger.py):
-```
-https://example.com/book1.pdf
-https://example.com/book2.pdf
-https://example.com/book3.pdf
-```
-
-### 3. Process Books
-All commands run from your **host terminal**:
+### 2. Opret Bogliste  
+Opret en tekstfil **på din værtsmaskine** med én URL per linje:
 
 ```bash
-# Process new books (runs in Docker automatically)
-./scripts/process_books.sh --file my_books.txt
+# Opret filen hvor som helst på din værtsmaskine
+nano mine_boeger.txt
+```
 
-# Monitor progress (in another host terminal - no Docker terminal)
+Indholdsformat (samme som eksisterende opret_bøger.py):
+```
+https://example.com/bog1.pdf
+https://example.com/bog2.pdf
+https://example.com/bog3.pdf
+```
+
+### 3. Behandl Bøger
+Alle kommandoer køres fra din **værtsmaskine terminal**:
+
+```bash
+# Behandl nye bøger (køres automatisk i Docker)
+./scripts/process_books.sh --file mine_boeger.txt
+
+# Overvåg fremgang (i en anden værtsmaskine terminal - ingen Docker terminal)
 ./scripts/process_books.sh --monitor
 
-# Retry failed books (runs in Docker automatically)  
+# Prøv fejlede bøger igen (køres automatisk i Docker)  
 ./scripts/process_books.sh --retry-failed
 ```
 
-**What happens**: Each command automatically:
-1. Starts a Docker container with your book processor
-2. Mounts your files into the container 
-3. Runs the processing
-4. Saves results back to your host machine
-5. Removes the temporary container
+**Hvad sker der**: Hver kommando automatisk:
+1. Starter en Docker container med din bogbehandler
+2. Monterer dine filer ind i containeren 
+3. Kører behandlingen
+4. Gemmer resultater tilbage til din værtsmaskine
+5. Fjerner den midlertidige container
 
-## How It Works
+## Sådan Fungerer Det
 
-This system wraps the existing `opret_bøger.py` functionality without changing it:
+Dette system indpakker den eksisterende `opret_bøger.py` funktionalitet uden at ændre den:
 
-- ✅ **Same chunking algorithm**: Sentence-based splitting with metadata inclusion (`##{title}##chunk`)
-- ✅ **Same concurrent processing**: 5 books processed simultaneously using semaphore  
-- ✅ **Same database operations**: Uses existing connection pooling and queries
-- ✅ **Same embedding creation**: Uses existing OpenAI integration with configurable models
-- ✅ **Added**: Progress monitoring, error recovery, containerization
+- ✅ **Samme chunking algoritme**: Sætningsbaseret opdeling med metadata inklusion (`##{titel}##chunk`)
+- ✅ **Samme samtidige behandling**: 5 bøger behandles samtidigt ved hjælp af semaphore  
+- ✅ **Samme database operationer**: Bruger eksisterende forbindelsespulje og forespørgsler
+- ✅ **Samme embedding oprettelse**: Bruger eksisterende OpenAI integration med konfigurerbare modeller
+- ✅ **Tilføjet**: Fremgangsovervågning, fejlhåndtering, containerisering
 
-## Environment Variables
+## Miljøvariabler
 
-The system uses the same environment variables as `opret_bøger.py`. Add these to your `.env` file:
+Systemet bruger de samme miljøvariabler som `opret_bøger.py`. Tilføj disse til din `.env` fil:
 
 ```bash
-# Database Configuration
-POSTGRES_DB=your_database_name
-POSTGRES_USER=your_username
-POSTGRES_PASSWORD=your_password
-POSTGRES_HOST=postgres  # Docker service name
+# Database Konfiguration
+POSTGRES_DB=dit_database_navn
+POSTGRES_USER=dit_brugernavn
+POSTGRES_PASSWORD=din_adgangskode
+POSTGRES_HOST=postgres  # Docker service navn
 
-# Embedding Configuration
-OPENAI_API_KEY=your_openai_api_key
+# Embedding Konfiguration
+OPENAI_API_KEY=din_openai_api_noegle
 OPENAI_MODEL=text-embedding-ada-002
 PROVIDER=openai
 
-# Processing Configuration
+# Behandlings Konfiguration
 CHUNK_SIZE=500
 
-# Logging Configuration
-LOG_DIR=./logs  # Directory for log files - both scripts will use this
+# Logging Konfiguration
+LOG_DIR=./logs  # Mappe til log filer - begge scripts vil bruge denne
 ```
 
-### Environment Variable Details
+### Miljøvariabel Detaljer
 
-- **POSTGRES_HOST**: Set to `postgres` when running in Docker, or your database host for local development
-- **OPENAI_MODEL**: The embedding model to use (e.g., `text-embedding-ada-002`, `text-embedding-3-small`)
-- **PROVIDER**: Set to `openai` for production, or `dummy` for testing
-- **CHUNK_SIZE**: Maximum tokens per text chunk (default: 500)
-- **LOG_DIR**: Directory where log files will be created (default: current directory). Both `opret_bøger.py` and `book_processor_wrapper.py` will write logs to this location
+- **POSTGRES_HOST**: Sæt til `postgres` når du kører i Docker, eller din database host til lokal udvikling
+- **OPENAI_MODEL**: Den embedding model der skal bruges (f.eks. `text-embedding-ada-002`, `text-embedding-3-small`)
+- **PROVIDER**: Sæt til `openai` til produktion, eller `dummy` til test
+- **CHUNK_SIZE**: Maksimale tokens per tekst chunk (standard: 500)
+- **LOG_DIR**: Mappe hvor log filer vil blive oprettet (standard: nuværende mappe). Både `opret_bøger.py` og `book_processor_wrapper.py` vil skrive logs til denne placering
 
-## Logging Configuration
+## Logging Konfiguration
 
-The book processing system uses a shared logging configuration to ensure consistent logging across all modules.
+Bogbehandlingssystemet bruger en delt logging konfiguration for at sikre konsistent logging på tværs af alle moduler.
 
-### Environment Variables for Logging
-- `LOG_DIR`: Directory where log files will be created (default: current directory)
+### Miljøvariabler til Logging
+- `LOG_DIR`: Mappe hvor log filer vil blive oprettet (standard: nuværende mappe)
 
-### Log File Format
-- Log files are named with timestamp: `opret_bøger_YYYY-MM-DD_HH-MM-SS.log`
-- Both `opret_bøger.py` and `book_processor_wrapper.py` use the same logging configuration
-- Logs are written to both file and console simultaneously
+### Log Fil Format
+- Log filer navngives med tidsstempel: `opret_bøger_YYYY-MM-DD_HH-MM-SS.log`
+- Både `opret_bøger.py` og `book_processor_wrapper.py` bruger samme logging konfiguration
+- Logs skrives til både fil og konsol samtidigt
 
-### Log Levels
-- **Console**: INFO and above
-- **File**: INFO and above  
-- **External libraries** (openai, aiohttp): WARNING and above (to reduce noise)
+### Log Niveauer
+- **Konsol**: INFO og højere
+- **Fil**: INFO og højere  
+- **Eksterne biblioteker** (openai, aiohttp): WARNING og højere (for at reducere støj)
 
-### Shared Logging Implementation
-Both scripts now use the shared `logging_config.setup_logging()` function:
+### Delt Logging Implementation
+Begge scripts bruger nu den delte `logging_config.setup_logging()` funktion:
 
 ```python
 from logging_config import setup_logging
 
-# Setup logging (will use LOG_DIR env var or current directory)
+# Opsæt logging (vil bruge LOG_DIR env var eller nuværende mappe)
 log_file = setup_logging()
 
-# Or specify custom directory
-log_file = setup_logging(log_dir="/path/to/logs")
+# Eller specificer brugerdefineret mappe
+log_file = setup_logging(log_dir="/sti/til/logs")
 ```
 
 ### Log Output Format
-All log entries follow this consistent format:
+Alle log indgange følger dette konsistente format:
 ```
-2025-06-05 14:22:35,123 - INFO - Processing started
-2025-06-05 14:22:36,456 - WARNING - Connection timeout, retrying...
-2025-06-05 14:22:37,789 - ERROR - Failed to process book: example.pdf
-2025-06-05 14:22:38,012 - INFO - ✓ Successfully processed: https://example.com/book1.pdf
+2025-06-05 14:22:35,123 - INFO - Behandling startet
+2025-06-05 14:22:36,456 - WARNING - Forbindelse timeout, prøver igen...
+2025-06-05 14:22:37,789 - ERROR - Fejl ved behandling af bog: example.pdf
+2025-06-05 14:22:38,012 - INFO - ✓ Successfuldt behandlet: https://example.com/bog1.pdf
 ```
 
 ### Docker Logging
-When using Docker, logs are automatically saved to the `book_output/` directory on your host machine:
+Når du bruger Docker, gemmes logs automatisk til `book_output/` mappen på din værtsmaskine:
 
 ```bash
-# View latest log file
+# Vis seneste log fil
 ls -t prototype/book_output/opret_bøger_*.log | head -1 | xargs cat
 
-# Follow real-time processing (in another terminal)
+# Følg realtids behandling (i en anden terminal)
 tail -f prototype/book_output/$(ls -t prototype/book_output/opret_bøger_*.log | head -1)
 ```
 
-## Commands Reference
+## Kommando Reference
 
-### Process Books from File
+### Behandl Bøger fra Fil
 ```bash
-./scripts/process_books.sh --file books.txt
+./scripts/process_books.sh --file boeger.txt
 ```
 
-Processes all URLs listed in the specified file using the existing opret_bøger.py logic.
+Behandler alle URL'er listet i den specificerede fil ved hjælp af den eksisterende opret_bøger.py logik.
 
-### Monitor Progress
+### Overvåg Fremgang
 ```bash
 ./scripts/process_books.sh --monitor
 ```
 
-Shows:
-- Current processing status (running, completed, error)
-- Number of books processed vs total
-- Number of failed books
-- Recent log entries
-- Failed books count and retry instructions
+Viser:
+- Nuværende behandlingsstatus (kører, afsluttet, fejl)
+- Antal bøger behandlet vs total
+- Antal fejlede bøger
+- Seneste log indgange
+- Fejlede bøger antal og retry instruktioner
 
-### Retry Failed Books
+### Prøv Fejlede Bøger Igen
 ```bash
 ./scripts/process_books.sh --retry-failed
 ```
 
-Automatically retries all books that failed in previous runs. Failed books are saved in `book_failed/failed_books.json`.
+Prøver automatisk alle bøger igen, der fejlede i tidligere kørsler. Fejlede bøger gemmes i `book_failed/failed_books.json`.
 
-### Validate Configuration
+### Valider Konfiguration
 ```bash
 ./scripts/process_books.sh --validate
 ```
 
-Checks that all required environment variables are set and displays current configuration.
+Tjekker at alle påkrævede miljøvariabler er sat og viser nuværende konfiguration.
 
-## File Locations
+## Fil Placeringer
 
-When running the book processor, files are organized as follows:
+Når du kører bogbehandleren, organiseres filer som følger:
 
 ```
 prototype/
-├── book_input/           # Input files (your book URL lists)
-├── book_output/          # Processing logs and status
+├── book_input/           # Input filer (dine bog URL lister)
+├── book_output/          # Behandlings logs og status
 │   ├── processing_status.json
 │   └── opret_bøger_*.log
-└── book_failed/          # Failed books for retry
+└── book_failed/          # Fejlede bøger til retry
     └── failed_books.json
 ```
 
-## Status File Format
+## Status Fil Format
 
-The `book_output/processing_status.json` file contains:
+`book_output/processing_status.json` filen indeholder:
 
 ```json
 {
-  "status": "completed",
-  "total_books": 10,
-  "processed": 8,
-  "failed": 2,
-  "last_updated": "2025-06-04T12:30:00",
+  "status": "afsluttet",
+  "total_boeger": 10,
+  "behandlet": 8,
+  "fejlet": 2,
+  "sidst_opdateret": "2025-06-04T12:30:00",
   "embedding_model": "text-embedding-ada-002",
-  "provider": "openai"
+  "udbyder": "openai"
 }
 ```
 
-## Failed Books Format
+## Fejlede Bøger Format
 
-The `book_failed/failed_books.json` file contains:
+`book_failed/failed_books.json` filen indeholder:
 
 ```json
 [
   {
-    "url": "https://example.com/problematic-book.pdf",
+    "url": "https://example.com/problematisk-bog.pdf",
     "error": "HTTP 404: Not Found",
     "timestamp": "2025-06-04T12:25:00"
   }
 ]
 ```
 
-## Troubleshooting
+## Fejlfinding
 
-### Common Issues
+### Almindelige Problemer
 
-**"Missing required environment variables"**
-- Ensure your `.env` file contains all required variables
-- Run `./scripts/process_books.sh --validate` to check
+**"Manglende påkrævede miljøvariabler"**
+- Sørg for at din `.env` fil indeholder alle påkrævede variabler
+- Kør `./scripts/process_books.sh --validate` for at tjekke
 
-**"Input file not found"**
-- Verify the file path is correct
-- Ensure the file exists and is readable
+**"Input fil ikke fundet"**
+- Verificer at filstien er korrekt
+- Sørg for at filen eksisterer og er læsbar
 
-**"Database connection failed"**
-- Check that PostgreSQL container is running: `docker-compose ps`
-- Verify database credentials in `.env` file
-- Ensure the database exists and has pgvector extension
+**"Database forbindelse fejlede"**
+- Tjek at PostgreSQL containeren kører: `docker-compose ps`
+- Verificer database legitimationsoplysninger i `.env` fil
+- Sørg for at databasen eksisterer og har pgvector udvidelse
 
-**"OpenAI API errors"**
-- Verify `OPENAI_API_KEY` is set correctly
-- Check API quota and billing status
-- Consider using a different model in `OPENAI_MODEL`
+**"OpenAI API fejl"**
+- Verificer at `OPENAI_API_KEY` er sat korrekt
+- Tjek API kvote og faktureringsstatus
+- Overvej at bruge en anden model i `OPENAI_MODEL`
 
-**"Log files not found or in wrong location"**
-- Check `LOG_DIR` environment variable is set correctly
-- Ensure the log directory exists and is writable
-- Both `opret_bøger.py` and `book_processor_wrapper.py` will create logs in the same location when `LOG_DIR` is set
+**"Log filer ikke fundet eller forkert placering"**
+- Tjek at `LOG_DIR` miljøvariablen er sat korrekt
+- Sørg for at log mappen eksisterer og er skrivbar
+- Både `opret_bøger.py` og `book_processor_wrapper.py` vil oprette logs samme sted når `LOG_DIR` er sat
 
-### Viewing Detailed Logs
+### Vis Detaljerede Logs
 
 ```bash
-# View latest log file
+# Vis seneste log fil
 ls -t book_output/opret_bøger_*.log | head -1 | xargs cat
 
-# Follow real-time processing (in another terminal)
+# Følg realtids behandling (i en anden terminal)
 tail -f book_output/opret_bøger_*.log
 ```
 
-### Manual Cleanup
+### Manuel Oprydning
 
 ```bash
-# Clear all processing data (start fresh)
+# Ryd alle behandlingsdata (start forfra)
 rm -rf book_output/* book_failed/*
 
-# Clear only failed books (to retry everything)
+# Ryd kun fejlede bøger (for at prøve alt igen)
 rm -f book_failed/failed_books.json
 ```
 
-## Performance Notes
+## Performance Noter
 
-- **Concurrent Processing**: 5 books are processed simultaneously (same as original opret_bøger.py)
-- **Database Connections**: Uses connection pooling for efficient database access
-- **Memory Usage**: Memory consumption scales with concurrent books and chunk size
-- **Rate Limiting**: OpenAI API calls are naturally throttled by concurrent book limit
+- **Samtidig Behandling**: 5 bøger behandles samtidigt (samme som originale opret_bøger.py)
+- **Database Forbindelser**: Bruger forbindelsespulje til effektiv database adgang
+- **Hukommelsesbrug**: Hukommelsesforbrug skalerer med samtidige bøger og chunk størrelse
+- **Rate Limiting**: OpenAI API kald begrænses naturligt af samtidig bog grænse
 
-## Integration with Existing System
+## Integration med Eksisterende System
 
-This book processor integrates seamlessly with your existing search system:
+Denne bogbehandler integrerer problemfrit med dit eksisterende søgesystem:
 
-1. **Database Schema**: Uses the same tables and structure as the original opret_bøger.py
-2. **Embedding Format**: Creates embeddings in the same format expected by the search API
-3. **Metadata**: Preserves the same metadata structure (`##{title}##chunk`) for search functionality
-4. **Vector Storage**: Stores vectors in the same pgvector format used by the search system
+1. **Database Skema**: Bruger samme tabeller og struktur som den originale opret_bøger.py
+2. **Embedding Format**: Opretter embeddings i samme format som søge API'et forventer
+3. **Metadata**: Bevarer samme metadata struktur (`##{titel}##chunk`) til søgefunktionalitet
+4. **Vector Lagring**: Gemmer vektorer i samme pgvector format brugt af søgesystemet
 
-## Examples
+## Eksempler
 
-### Process a Small Test Batch
+### Behandl en Lille Test Batch
 ```bash
-# Create test file
-echo -e "https://example.com/book1.pdf\nhttps://example.com/book2.pdf" > test_books.txt
+# Opret test fil
+echo -e "https://example.com/bog1.pdf\nhttps://example.com/bog2.pdf" > test_boeger.txt
 
-# Process with monitoring
-./scripts/process_books.sh --file test_books.txt
+# Behandl med overvågning
+./scripts/process_books.sh --file test_boeger.txt
 
-# Check results
+# Tjek resultater
 ./scripts/process_books.sh --monitor
 ```
 
-### Handle Large Batches
+### Håndter Store Batches
 ```bash
-# Process large batch (hundreds of books)
-./scripts/process_books.sh --file large_book_list.txt
+# Behandl stor batch (hundreder af bøger)
+./scripts/process_books.sh --file stor_bog_liste.txt
 
-# Monitor in separate terminal
+# Overvåg i separat terminal
 watch './scripts/process_books.sh --monitor'
 
-# If some fail, retry them
+# Hvis nogle fejler, prøv dem igen
 ./scripts/process_books.sh --retry-failed
 ```
 
-## Benefits
+## Fordele
 
-- ✅ **No code changes** to proven opret_bøger.py logic
-- ✅ **Same performance** - identical concurrent processing (5 books at once)
-- ✅ **Same quality** - identical chunking and embedding creation  
-- ✅ **Added monitoring** - track progress and failures in real-time
-- ✅ **Added recovery** - retry failed books easily without manual intervention
-- ✅ **Added portability** - works on local Mac and remote Linux servers
-- ✅ **User-friendly** - simple command-line interface requiring no technical knowledge
-- ✅ **Production-ready** - containerized with proper logging and error handling
+- ✅ **Ingen kode ændringer** til den afprøvede opret_bøger.py logik
+- ✅ **Samme ydeevne** - identisk samtidig behandling (5 bøger ad gangen)
+- ✅ **Samme kvalitet** - identisk chunking og embedding oprettelse  
+- ✅ **Tilføjet overvågning** - spor fremgang og fejl i realtid
+- ✅ **Tilføjet genoprettelse** - prøv fejlede bøger igen nemt uden manuel indgriben
+- ✅ **Tilføjet portabilitet** - virker på lokal Mac og fjerne Linux servere
+- ✅ **Brugervenlig** - simpel kommandolinje interface der ikke kræver teknisk viden
+- ✅ **Produktionsklar** - containeriseret med ordentlig logging og fejlhåndtering
 
-## Docker Workflow Explained
+## Docker Workflow Forklaret
 
-### How Docker Integration Works
+### Hvordan Docker Integration Virker
 
-You work entirely from your **host machine** (Mac/Linux terminal). Here's what happens behind the scenes:
+Du arbejder udelukkende fra din **værtsmaskine** (Mac/Linux terminal). Her er hvad der sker bag kulisserne:
 
 ```
-Your Host Machine                    Docker Container
+Din Værtsmaskine                    Docker Container
     ┌─────────────────┐                ┌──────────────────┐
-    │ 1. You run:     │                │                  │
+    │ 1. Du kører:    │                │                  │
     │ ./scripts/      │                │                  │
     │ process_books.sh│───────────────▶│ 2. Container     │
-    │                 │                │    starts        │
-    │                 │                │    automatically  │
+    │                 │                │    starter       │
+    │                 │                │    automatisk    │
     └─────────────────┘                └──────────────────┘
            │                                      │
            │                                      ▼
     ┌─────────────────┐                ┌──────────────────┐
-    │ 4. Results      │                │ 3. Processing    │
-    │    saved to     │◀───────────────│    happens in    │
-    │    host folders │                │    container     │
+    │ 4. Resultater   │                │ 3. Behandling    │
+    │    gemt til     │◀───────────────│    sker i        │
+    │    værtsmapper  │                │    container     │
     │                 │                │                  │
     └─────────────────┘                └──────────────────┘
 ```
 
-### File Locations on Your Host Machine
+### Fil Placeringer på Din Værtsmaskine
 
-All files remain on your host machine in these locations:
+Alle filer forbliver på din værtsmaskine i disse placeringer:
 
 ```bash
-/path/to/SlægtBib/src/
-├── my_books.txt                    # Your input file (you create this)
-├── scripts/process_books.sh        # The script you run
+/sti/til/SlægtBib/src/
+├── mine_boeger.txt                 # Din input fil (du opretter denne)
+├── scripts/process_books.sh        # Scriptet du kører
 └── prototype/
-    ├── book_input/                 # Input files (auto-created)
-    ├── book_output/                # Results you can view
-    │   ├── processing_status.json  # Status file
-    │   └── opret_bøger_*.log      # Log files
-    └── book_failed/                # Failed books
-        └── failed_books.json       # Failed books list
+    ├── book_input/                 # Input filer (auto-oprettet)
+    ├── book_output/                # Resultater du kan se
+    │   ├── processing_status.json  # Status fil
+    │   └── opret_bøger_*.log      # Log filer
+    └── book_failed/                # Fejlede bøger
+        └── failed_books.json       # Fejlede bøger liste
 ```
 
-**Important**: You can view, edit, and manage all these files directly from your host machine - no need to access Docker containers.
+**Vigtigt**: Du kan se, redigere og administrere alle disse filer direkte fra din værtsmaskine - ingen grund til at tilgå Docker containere.
 
-## Step-by-Step Docker Usage
+## Trin-for-Trin Docker Brug
 
-### Complete Workflow Example
+### Komplet Workflow Eksempel
 
 ```bash
-# 1. Navigate to project (on your host machine)
+# 1. Naviger til projektet (på din værtsmaskine)
 cd /Users/steen/Library/Mobile\ Documents/com~apple~CloudDocs/Projekter/SlægtBib/src
 
-# 2. Check Docker is running
+# 2. Tjek at Docker kører
 docker --version
 docker-compose --version
 
-# 3. Validate configuration (auto-starts container temporarily)
+# 3. Valider konfiguration (starter container midlertidigt automatisk)
 ./scripts/process_books.sh --validate
 
-# 4. Create your book list (on host machine)
-echo -e "https://example.com/book1.pdf\nhttps://example.com/book2.pdf" > my_books.txt
+# 4. Opret din bogliste (på værtsmaskinen)
+echo -e "https://example.com/bog1.pdf\nhttps://example.com/bog2.pdf" > mine_boeger.txt
 
-# 5. Process books (auto-starts container, processes, then stops)
-./scripts/process_books.sh --file my_books.txt
+# 5. Behandl bøger (starter container automatisk, behandler, derefter stopper)
+./scripts/process_books.sh --file mine_boeger.txt
 
-# 6. Check results (files are on your host machine)
+# 6. Tjek resultater (filer er på din værtsmaskine)
 ./scripts/process_books.sh --monitor
 
-# 7. If needed, retry failures (auto-starts container again)
+# 7. Hvis nødvendigt, prøv fejl igen (starter container automatisk igen)
 ./scripts/process_books.sh --retry-failed
 ```
 
-### What You'll See During Processing
+### Hvad Du Vil Se Under Behandling
 
-When you run `./scripts/process_books.sh --file my_books.txt`:
+Når du kører `./scripts/process_books.sh --file mine_boeger.txt`:
 
 ```
-=== Processing Books ===
-Input file: my_books.txt
-Using existing opret_bøger.py logic with monitoring...
+=== Behandler Bøger ===
+Input fil: mine_boeger.txt
+Bruger eksisterende opret_bøger.py logik med overvågning...
 
 [+] Building 0.0s (0/0)                                    
 [+] Running 1/0
  ✔ Container dho-book-processor  Created                   0.0s
 Attaching to dho-book-processor
-dho-book-processor  | 2025-06-04 12:30:00 - INFO - Processing 2 books using existing opret_bøger logic
-dho-book-processor  | 2025-06-04 12:30:15 - INFO - ✓ Successfully processed: https://example.com/book1.pdf
-dho-book-processor  | 2025-06-04 12:30:30 - INFO - ✓ Successfully processed: https://example.com/book2.pdf
-dho-book-processor  | 2025-06-04 12:30:31 - INFO - Processing completed: 2 successful, 0 failed
+dho-book-processor  | 2025-06-04 12:30:00 - INFO - Behandler 2 bøger ved hjælp af eksisterende opret_bøger logik
+dho-book-processor  | 2025-06-04 12:30:15 - INFO - ✓ Successfuldt behandlet: https://example.com/bog1.pdf
+dho-book-processor  | 2025-06-04 12:30:30 - INFO - ✓ Successfuldt behandlet: https://example.com/bog2.pdf
+dho-book-processor  | 2025-06-04 12:30:31 - INFO - Behandling afsluttet: 2 vellykket, 0 fejlet
 [+] Container dho-book-processor  Exited (0)
 
-=== Processing Complete ===
-Check results:
+=== Behandling Afsluttet ===
+Tjek resultater:
   Status: ./scripts/process_books.sh --monitor
 ```
 
-### Monitoring in Real-Time
+### Overvågning i Realtid
 
-Open a **second terminal on your host machine** and run:
+Åbn en **anden terminal på din værtsmaskine** og kør:
 
 ```bash
-# This shows status without starting containers
+# Dette viser status uden at starte containere
 ./scripts/process_books.sh --monitor
 ```
 
 Output:
 ```
-=== Current Status ===
+=== Nuværende Status ===
 {
-  "status": "running",
-  "total_books": 10,
-  "processed": 3,
-  "failed": 0,
-  "last_updated": "2025-06-04T12:30:00",
+  "status": "kører",
+  "total_boeger": 10,
+  "behandlet": 3,
+  "fejlet": 0,
+  "sidst_opdateret": "2025-06-04T12:30:00",
   "embedding_model": "text-embedding-ada-002",
-  "provider": "openai"
+  "udbyder": "openai"
 }
 
-=== Recent Logs ===
-2025-06-04 12:30:00 - INFO - ✓ Successfully processed: https://example.com/book1.pdf
-2025-06-04 12:30:15 - INFO - Processing book 4/10: https://example.com/book4.pdf
+=== Seneste Logs ===
+2025-06-04 12:30:00 - INFO - ✓ Successfuldt behandlet: https://example.com/bog1.pdf
+2025-06-04 12:30:15 - INFO - Behandler bog 4/10: https://example.com/bog4.pdf
 ```
 
-## Docker Commands Reference
+## Docker Kommando Reference
 
-### All Commands Run from Host Terminal
+### Alle Kommandoer Køres fra Værtsmaskine Terminal
 
-**Never run these commands inside Docker containers** - they automatically manage containers for you:
+**Kør aldrig disse kommandoer inde i Docker containere** - de håndterer automatisk containere for dig:
 
-| Command | What It Does | Docker Behavior |
+| Kommando | Hvad Den Gør | Docker Adfærd |
 |---------|-------------|-----------------|
-| `./scripts/process_books.sh --validate` | Check configuration | Starts container → validates → stops container |
-| `./scripts/process_books.sh --file books.txt` | Process books | Starts container → processes → stops container |
-| `./scripts/process_books.sh --monitor` | Show status | **No container** - reads files from host |
-| `./scripts/process_books.sh --retry-failed` | Retry failures | Starts container → retries → stops container |
+| `./scripts/process_books.sh --validate` | Tjek konfiguration | Starter container → validerer → stopper container |
+| `./scripts/process_books.sh --file boeger.txt` | Behandl bøger | Starter container → behandler → stopper container |
+| `./scripts/process_books.sh --monitor` | Vis status | **Ingen container** - læser filer fra værtsmaskine |
+| `./scripts/process_books.sh --retry-failed` | Prøv fejl igen | Starter container → prøver igen → stopper container |
 
-### Manual Docker Commands (If Needed)
+### Manuelle Docker Kommandoer (Hvis Nødvendigt)
 
-If you need to manually interact with Docker (rarely needed):
+Hvis du har brug for at interagere manuelt med Docker (sjældent nødvendigt):
 
 ```bash
-# Check if containers are running
+# Tjek om containere kører
 docker-compose ps
 
-# View container logs (only while processing)
+# Se container logs (kun under behandling)
 docker-compose logs book-processor
 
-# Stop all containers if needed
+# Stop alle containere hvis nødvendigt
 docker-compose down
 
-# Rebuild container after code changes
+# Genopbyg container efter kode ændringer
 docker-compose build book-processor
 ```
 
-### Troubleshooting Docker Issues
+### Fejlfinding af Docker Problemer
 
-**"docker-compose command not found"**
+**"docker-compose kommando ikke fundet"**
 ```bash
-# Install docker-compose or use newer syntax
-docker compose --version  # Try this instead
+# Installer docker-compose eller brug nyere syntaks
+docker compose --version  # Prøv dette i stedet
 ```
 
-**"Permission denied"**
+**"Tilladelse nægtet"**
 ```bash
-# Make script executable
+# Gør script eksekverbart
 chmod +x ./scripts/process_books.sh
 ```
 
-**"No such file or directory"**
+**"Ingen sådan fil eller mappe"**
 ```bash
-# Ensure you're in the correct directory
-cd /path/to/SlægtBib/src
-pwd  # Should show the project directory
+# Sørg for at du er i den korrekte mappe
+cd /sti/til/SlægtBib/src
+pwd  # Skulle vise projektmappen
 ```
 
-**Container won't start**
+**Container vil ikke starte**
 ```bash
-# Check Docker is running
+# Tjek at Docker kører
 docker --version
 docker-compose --version
 
-# Check your .env file exists
+# Tjek at din .env fil eksisterer
 ls -la prototype/.env
 
-# Validate configuration
+# Valider konfiguration
 ./scripts/process_books.sh --validate
 ```
 
-## Remote Linux Server Usage
+## Fjern Linux Server Brug
 
-### Same Commands, Different Location
+### Samme Kommandoer, Forskellig Placering
 
-On a remote Linux server, the workflow is identical:
+På en fjern Linux server er workflow'et identisk:
 
 ```bash
-# SSH to your server first
-ssh user@your-server.com
+# SSH til din server først
+ssh bruger@din-server.com
 
-# Navigate to project
-cd /path/to/SlægtBib/src
+# Naviger til projekt
+cd /sti/til/SlægtBib/src
 
-# Use exact same commands
+# Brug præcis samme kommandoer
 ./scripts/process_books.sh --validate
-./scripts/process_books.sh --file books.txt
+./scripts/process_books.sh --file boeger.txt
 ./scripts/process_books.sh --monitor
 ```
 
-### File Transfer to Remote Server
+### Fil Overførsel til Fjern Server
 
 ```bash
-# Copy book list to server
-scp my_books.txt user@server:/path/to/SlægtBib/src/
+# Kopier bogliste til server
+scp mine_boeger.txt bruger@server:/sti/til/SlægtBib/src/
 
-# Process on server
-ssh user@server "cd /path/to/SlægtBib/src && ./scripts/process_books.sh --file my_books.txt"
+# Behandl på server
+ssh bruger@server "cd /sti/til/SlægtBib/src && ./scripts/process_books.sh --file mine_boeger.txt"
 
-# Copy results back (optional)
-scp user@server:/path/to/SlægtBib/src/prototype/book_output/* ./results/
+# Kopier resultater tilbage (valgfrit)
+scp bruger@server:/sti/til/SlægtBib/src/prototype/book_output/* ./resultater/
 ```
 
-## Key Benefits of This Docker Approach
+## Nøgle Fordele ved Denne Docker Tilgang
 
-✅ **No container terminal access needed** - everything controlled from host
+✅ **Ingen container terminal adgang nødvendig** - alt styres fra værtsmaskinen
 
-✅ **Automatic container management** - containers start and stop as needed
+✅ **Automatisk container håndtering** - containere starter og stopper efter behov
 
-✅ **File persistence** - all files remain on your host machine
+✅ **Fil persistens** - alle filer forbliver på din værtsmaskine
 
-✅ **Cross-platform** - identical commands on Mac and Linux
+✅ **Krydsplatform** - identiske kommandoer på Mac og Linux
 
-✅ **Resource efficient** - containers only run when processing
+✅ **Ressource effektiv** - containere kører kun under behandling
 
-✅ **Easy monitoring** - view files and status without Docker knowledge
+✅ **Let overvågning** - se filer og status uden Docker viden

@@ -80,11 +80,11 @@ def extract_text_from_chunk(raw_chunk: str):
     """
     Fjerner bogtitlen fra den chunktekst der er lavet embedding af
 
-    Parameters:
-        raw_chunk (str): The raw chunk of text to be split.
+    Parametre:
+        raw_chunk (str): Den rå chunk af tekst der skal opdeles.
 
-    Returns:
-        str: The third part of the split raw chunk.
+    Returnerer:
+        str: Den tredje del af den opdelte rå chunk.
     """
     parts = raw_chunk.split("##")
     if len(parts) > 1:
@@ -166,7 +166,7 @@ def handle_pdf_files(get_books, database, db_user, db_password, openai_client) -
 
         pdf_pages = extract_text_by_page(pdf)     
 
-        for page_no, page_text in tqdm(pdf_pages.items(), desc=f"Chunking"):
+        for page_no, page_text in tqdm(pdf_pages.items(), desc="Opdeling i chunks"):
             chunks = chunk_text(page_text)
 
             for chunk in chunks:
