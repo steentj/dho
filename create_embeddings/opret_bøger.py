@@ -12,6 +12,7 @@ import re
 import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
+from logging_config import setup_logging
 
 # Define the EmbeddingProvider interface
 class EmbeddingProvider(ABC):
@@ -231,20 +232,8 @@ async def main():
     
     embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
 
-    # Konfigurer logging
-    logging.basicConfig(
-        level=logging.INFO,  # Logniveau
-        format="%(asctime)s - %(levelname)s - %(message)s",  # Logformat
-        handlers=[
-            logging.FileHandler(
-                f"opret_bøger_{datetime.now():%Y-%m-%d_%H-%M-%S}.log", encoding="utf-8"
-            ),  # Log til fil
-            logging.StreamHandler(),  # Log til konsol (valgfrit)
-        ],
-    )
-    # Undertryk info logs fra openai og aiohttp loggere
-    logging.getLogger("openai").setLevel(logging.WARNING)
-    logging.getLogger("aiohttp").setLevel(logging.WARNING)
+    # Configure logging using shared configuration
+    log_file = setup_logging(log_dir=os.getenv("LOG_DIR"))
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     url_file_path = os.path.join(script_dir, url_file)

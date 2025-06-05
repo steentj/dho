@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import json
 import os
 import sys
@@ -12,6 +13,7 @@ from opret_bøger import (
     process_book,
     EmbeddingProviderFactory
 )
+from logging_config import setup_logging
 
 class BookProcessorWrapper:
     """Wrapper around existing opret_bøger.py functionality"""
@@ -30,20 +32,9 @@ class BookProcessorWrapper:
         self.failed_books = []
         
     def setup_logging(self):
-        """Setup logging using existing opret_bøger pattern"""
-        log_file = self.output_dir / f"opret_bøger_{datetime.now():%Y-%m-%d_%H-%M-%S}.log"
-        
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(log_file, encoding="utf-8"),
-                logging.StreamHandler(),
-            ],
-        )
-        # Keep existing logger configuration
-        logging.getLogger("openai").setLevel(logging.WARNING)
-        logging.getLogger("aiohttp").setLevel(logging.WARNING)
+        """Setup logging using shared configuration"""
+        # Use shared logging configuration with the output directory
+        setup_logging(log_dir=str(self.output_dir))
     
     def update_status(self, status: str = "running"):
         """Update processing status file"""
@@ -205,7 +196,6 @@ class BookProcessorWrapper:
 
 def main():
     """Main entry point with argument parsing"""
-    import argparse
     
     parser = argparse.ArgumentParser(description='Streamlined book processor using existing opret_bøger logic')
     parser.add_argument('--input-file', help='Input file with book URLs')

@@ -86,6 +86,9 @@ PROVIDER=openai
 
 # Processing Configuration
 CHUNK_SIZE=500
+
+# Logging Configuration
+LOG_DIR=./logs  # Directory for log files - both scripts will use this
 ```
 
 ### Environment Variable Details
@@ -94,6 +97,57 @@ CHUNK_SIZE=500
 - **OPENAI_MODEL**: The embedding model to use (e.g., `text-embedding-ada-002`, `text-embedding-3-small`)
 - **PROVIDER**: Set to `openai` for production, or `dummy` for testing
 - **CHUNK_SIZE**: Maximum tokens per text chunk (default: 500)
+- **LOG_DIR**: Directory where log files will be created (default: current directory). Both `opret_bøger.py` and `book_processor_wrapper.py` will write logs to this location
+
+## Logging Configuration
+
+The book processing system uses a shared logging configuration to ensure consistent logging across all modules.
+
+### Environment Variables for Logging
+- `LOG_DIR`: Directory where log files will be created (default: current directory)
+
+### Log File Format
+- Log files are named with timestamp: `opret_bøger_YYYY-MM-DD_HH-MM-SS.log`
+- Both `opret_bøger.py` and `book_processor_wrapper.py` use the same logging configuration
+- Logs are written to both file and console simultaneously
+
+### Log Levels
+- **Console**: INFO and above
+- **File**: INFO and above  
+- **External libraries** (openai, aiohttp): WARNING and above (to reduce noise)
+
+### Shared Logging Implementation
+Both scripts now use the shared `logging_config.setup_logging()` function:
+
+```python
+from logging_config import setup_logging
+
+# Setup logging (will use LOG_DIR env var or current directory)
+log_file = setup_logging()
+
+# Or specify custom directory
+log_file = setup_logging(log_dir="/path/to/logs")
+```
+
+### Log Output Format
+All log entries follow this consistent format:
+```
+2025-06-05 14:22:35,123 - INFO - Processing started
+2025-06-05 14:22:36,456 - WARNING - Connection timeout, retrying...
+2025-06-05 14:22:37,789 - ERROR - Failed to process book: example.pdf
+2025-06-05 14:22:38,012 - INFO - ✓ Successfully processed: https://example.com/book1.pdf
+```
+
+### Docker Logging
+When using Docker, logs are automatically saved to the `book_output/` directory on your host machine:
+
+```bash
+# View latest log file
+ls -t prototype/book_output/opret_bøger_*.log | head -1 | xargs cat
+
+# Follow real-time processing (in another terminal)
+tail -f prototype/book_output/$(ls -t prototype/book_output/opret_bøger_*.log | head -1)
+```
 
 ## Commands Reference
 
@@ -195,6 +249,11 @@ The `book_failed/failed_books.json` file contains:
 - Verify `OPENAI_API_KEY` is set correctly
 - Check API quota and billing status
 - Consider using a different model in `OPENAI_MODEL`
+
+**"Log files not found or in wrong location"**
+- Check `LOG_DIR` environment variable is set correctly
+- Ensure the log directory exists and is writable
+- Both `opret_bøger.py` and `book_processor_wrapper.py` will create logs in the same location when `LOG_DIR` is set
 
 ### Viewing Detailed Logs
 
