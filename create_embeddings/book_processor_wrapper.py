@@ -65,7 +65,7 @@ class BookProcessorWrapper:
             # Use EXISTING process_book function unchanged
             await process_book(book_url, chunk_size, pool, session, embedding_provider)
             self.processed_count += 1
-            logging.info(f"✓ Successfully processed: {book_url}")
+            logging.info(f"✓ Book processed or skipped (already exists): {book_url}")
             
         except Exception as e:
             self.failed_count += 1

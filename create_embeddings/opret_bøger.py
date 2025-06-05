@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 import os
 import re
 import logging
-from datetime import datetime
 from abc import ABC, abstractmethod
 from logging_config import setup_logging
 
@@ -195,28 +194,31 @@ async def parse_book(pdf, book_url, chunk_size, embedding_provider):
 
 async def process_book(book_url, chunk_size, pool, session, embedding_provider):
     """Behandl en enkelt bog fra URL til database."""
-    pdf = await fetch_pdf(book_url, session)
-
-    if pdf:
-        try:
-            async with pool.acquire() as conn:
-                # Check om bogen allerede findes i databasen
-                result = await safe_db_execute(
-                    book_url,
-                    conn,
-                    "SELECT id FROM books WHERE pdf_navn = $1",
-                    book_url,
-                )
-                if not result:
-                    book = await parse_book(pdf, book_url, chunk_size, embedding_provider)
-                    await save_book(book, conn)
-                    logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
-                else:
-                    logging.info(f"Bogen {book_url} er allerede i databasen")
-        except Exception as e:
-            logging.exception(f"Fejl ved behandling af {book_url}: {e}")
-    else:
-        logging.warning(f"Kunne ikke hente PDF fra {book_url}")
+    try:
+        async with pool.acquire() as conn:
+            # Check om bogen allerede findes i databasen FØRST
+            result = await safe_db_execute(
+                book_url,
+                conn,
+                "SELECT id FROM books WHERE pdf_navn = $1",
+                book_url,
+            )
+            if result:
+                logging.info(f"Bogen {book_url} er allerede i databasen - springer over")
+                return
+            
+            # Hvis bogen ikke findes, hent PDF og behandl den
+            pdf = await fetch_pdf(book_url, session)
+            
+            if pdf:
+                book = await parse_book(pdf, book_url, chunk_size, embedding_provider)
+                await save_book(book, conn)
+                logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
+            else:
+                logging.warning(f"Kunne ikke hente PDF fra {book_url}")
+                
+    except Exception as e:
+        logging.exception(f"Fejl ved behandling af {book_url}: {e}")
 
 
 async def main():
@@ -233,7 +235,7 @@ async def main():
     embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
 
     # Configure logging using shared configuration
-    log_file = setup_logging(log_dir=os.getenv("LOG_DIR"))
+    setup_logging(log_dir=os.getenv("LOG_DIR"))
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     url_file_path = os.path.join(script_dir, url_file)
