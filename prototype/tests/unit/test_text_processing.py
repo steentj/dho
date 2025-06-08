@@ -13,7 +13,7 @@ create_embeddings_path = Path(__file__).parent.parent.parent.parent / "create_em
 sys.path.insert(0, str(create_embeddings_path))
 
 try:
-    from opret_bøger import (
+    from create_embeddings.opret_bøger import (
         chunk_text, 
         extract_text_by_page, 
         indlæs_urls,
@@ -230,17 +230,22 @@ class TestDummyEmbeddingProvider:
 @pytest.mark.unit
 class TestOpenAIEmbeddingProvider:
     """Test the OpenAIEmbeddingProvider class."""
-    
     @pytest.mark.asyncio
     async def test_get_embedding_with_mock(self, mock_async_openai_client):
         """Test embedding generation with mocked OpenAI client."""
-        with patch('opret_bøger.AsyncOpenAI') as mock_openai_class:
+        # Mock the OpenAI embeddings response
+        mock_response = MagicMock()
+        mock_response.data = [MagicMock(embedding=[0.1] * 1536)]
+        mock_async_openai_client.embeddings.create.return_value = mock_response
+
+        with patch('create_embeddings.opret_bøger.AsyncOpenAI') as mock_openai_class:
             mock_openai_class.return_value = mock_async_openai_client
             
             provider = OpenAIEmbeddingProvider("test_key")
             embedding = await provider.get_embedding("test chunk")
-            
-            assert embedding == [0.1] * 1536
+
+            assert len(embedding) == 1536
+            assert embedding == mock_response.data[0].embedding
             mock_async_openai_client.embeddings.create.assert_called_once()
     
     def test_initialization(self):
@@ -269,13 +274,13 @@ class TestSafeDbExecute:
         
         assert result == 42
         mock_database_connection.fetchval.assert_called_once_with("SELECT 1", "param1")
-    
     @pytest.mark.asyncio
     async def test_exception_handling(self, mock_database_connection):
         """Test exception handling in database execution."""
         mock_database_connection.fetchval.side_effect = Exception("Database error")
         
-        with patch('opret_bøger.logging') as mock_logging:
+        mock_logging = MagicMock()
+        with patch('create_embeddings.opret_bøger.logging', mock_logging):
             result = await safe_db_execute(
                 "http://test.com/book.pdf",
                 mock_database_connection,
@@ -290,7 +295,7 @@ class TestSafeDbExecute:
         """Test that logging includes the URL for context."""
         mock_database_connection.fetchval.side_effect = Exception("Database error")
         
-        with patch('opret_bøger.logging') as mock_logging:
+        with patch('create_embeddings.opret_bøger.logging') as mock_logging:
             await safe_db_execute(
                 "http://test.com/book.pdf",
                 mock_database_connection,

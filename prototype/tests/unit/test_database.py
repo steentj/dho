@@ -11,7 +11,7 @@ create_embeddings_path = Path(__file__).parent.parent.parent.parent / "create_em
 sys.path.insert(0, str(create_embeddings_path))
 
 try:
-    from opret_bøger import (
+    from create_embeddings.opret_bøger import (
         safe_db_execute,
         save_book
     )
@@ -91,53 +91,39 @@ class TestSaveBook:
     @pytest.mark.asyncio
     async def test_save_book_success(self):
         """Test successful book saving."""
-        # Create the main connection mock
         mock_conn = AsyncMock()
-        
-        # Create a mock for the transaction context
         transaction_context = AsyncMock()
-        # Set up the async context manager protocol
         transaction_context.__aenter__.return_value = transaction_context
         transaction_context.__aexit__.return_value = None
-        # Make transaction a regular method that returns the context
         mock_conn.transaction = lambda: transaction_context
-        
-        # Mock book data structure
+
         book = {
             'pdf-url': 'https://example.com/book.pdf',
             'titel': 'Test Book',
             'forfatter': 'Test Author',
             'sider': 1,
             'chunks': [(1, "This is a test chunk."), (2, "This is another test chunk.")],
-            'embeddings': [[0.1, 0.2], [0.3, 0.4]]  # Mock embeddings
+            'embeddings': [[0.1, 0.2], [0.3, 0.4]]
         }
-        
-        with patch('opret_bøger.safe_db_execute') as mock_execute:
-            mock_execute.return_value = 1  # Mock book ID return
-            
+
+        with patch('create_embeddings.opret_bøger.safe_db_execute') as mock_execute:
+            mock_execute.return_value = 1
+
             await save_book(book, mock_conn)
-            
-            # Verify context manager was used
+
             transaction_context.__aenter__.assert_called_once()
             transaction_context.__aexit__.assert_called_once()
-            
-            # Verify safe_db_execute was called for book insertion and chunks
-            assert mock_execute.call_count == 3  # Once for book + twice for chunks
+            assert mock_execute.call_count == 3
 
     @pytest.mark.asyncio
     async def test_save_book_with_multiple_pages(self):
         """Test saving book with multiple pages."""
-        # Create the main connection mock
         mock_conn = AsyncMock()
-        
-        # Create a mock for the transaction context
         transaction_context = AsyncMock()
-        # Set up the async context manager protocol
         transaction_context.__aenter__.return_value = transaction_context
         transaction_context.__aexit__.return_value = None
-        # Make transaction a regular method that returns the context
         mock_conn.transaction = lambda: transaction_context
-        
+
         book = {
             'pdf-url': 'https://example.com/multipage.pdf',
             'titel': 'Multi-page Book',
@@ -150,33 +136,25 @@ class TestSaveBook:
             ],
             'embeddings': [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
         }
-        
-        with patch('opret_bøger.safe_db_execute') as mock_execute:
-            mock_execute.return_value = 1  # Mock book ID return
-            
+
+        with patch('create_embeddings.opret_bøger.safe_db_execute') as mock_execute:
+            mock_execute.return_value = 1
+
             await save_book(book, mock_conn)
-            
-            # Verify context manager was used
+
             transaction_context.__aenter__.assert_called_once()
             transaction_context.__aexit__.assert_called_once()
-            
-            # Should be called for book + three chunks
             assert mock_execute.call_count == 4
 
     @pytest.mark.asyncio
     async def test_save_book_database_error(self):
         """Test book saving with database error."""
-        # Create the main connection mock
         mock_conn = AsyncMock()
-        
-        # Create a mock for the transaction context
         transaction_context = AsyncMock()
-        # Set up the async context manager protocol
         transaction_context.__aenter__.return_value = transaction_context
         transaction_context.__aexit__.return_value = None
-        # Make transaction a regular method that returns the context
         mock_conn.transaction = lambda: transaction_context
-        
+
         book = {
             'pdf-url': 'https://example.com/error.pdf',
             'titel': 'Error Test Book',
@@ -185,31 +163,22 @@ class TestSaveBook:
             'chunks': [(1, "Test content")],
             'embeddings': [[0.1, 0.2]]
         }
-        
-        with patch('opret_bøger.safe_db_execute') as mock_execute:
+
+        with patch('create_embeddings.opret_bøger.safe_db_execute') as mock_execute:
             mock_execute.side_effect = Exception("Database error")
-            
+
             with pytest.raises(Exception, match="Database error"):
                 await save_book(book, mock_conn)
-            
-            # Verify context manager was used
-            transaction_context.__aenter__.assert_called_once()
-            transaction_context.__aexit__.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_save_book_empty_chunks(self):
         """Test saving book with no chunks."""
-        # Create the main connection mock
         mock_conn = AsyncMock()
-        
-        # Create a mock for the transaction context
         transaction_context = AsyncMock()
-        # Set up the async context manager protocol
         transaction_context.__aenter__.return_value = transaction_context
         transaction_context.__aexit__.return_value = None
-        # Make transaction a regular method that returns the context
         mock_conn.transaction = lambda: transaction_context
-        
+
         book = {
             'pdf-url': 'https://example.com/empty.pdf',
             'titel': 'Empty Book',
@@ -218,17 +187,14 @@ class TestSaveBook:
             'chunks': [],
             'embeddings': []
         }
-        
-        with patch('opret_bøger.safe_db_execute') as mock_execute:
-            mock_execute.return_value = 1  # Mock book ID return
-            
+
+        with patch('create_embeddings.opret_bøger.safe_db_execute') as mock_execute:
+            mock_execute.return_value = 1
+
             await save_book(book, mock_conn)
-            
-            # Verify context manager was used
+
             transaction_context.__aenter__.assert_called_once()
             transaction_context.__aexit__.assert_called_once()
-            
-            # Should be called only once for the book entry
             assert mock_execute.call_count == 1
 
 
