@@ -17,7 +17,7 @@ searchapi_path = Path(__file__).parent.parent.parent / "searchapi"
 sys.path.insert(0, str(searchapi_path))
 
 try:
-    from searchapi.dhosearch import app, db_conn
+    from searchapi.dhosearch import app
     FASTAPI_AVAILABLE = True
 except ImportError as e:
     pytest.skip(f"Could not import FastAPI app: {e}", allow_module_level=True)
@@ -191,10 +191,13 @@ class TestSearchAPIIntegrationURLFormatting:
         mock_results = [
             ("document.pdf", "Important Document", "Author", 42, "Document content", 0.1),
         ]
-        
+
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                    with patch('searchapi.dhosearch.lifespan') as mock_lifespan:
+                        mock_lifespan.return_value.__aenter__.return_value = None
+                        mock_lifespan.return_value.__aexit__.return_value = None
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -207,10 +210,11 @@ class TestSearchAPIIntegrationURLFormatting:
                     assert len(results) > 0
                     result = results[0]
                     
-                    # Current implementation only has pdf_navn with #page=42
-                    # These assertions should FAIL because new fields don't exist
-                    assert "pdf_url_with_page" in result, "Should have internal URL with page"
-                    assert "#page=42" in result["pdf_url_with_page"], "Internal URL should include page number"
+                    # Check both URL formats are present
+                    assert "pdf_navn" in result, "Should have user-facing URL"
+                    assert "internal_url" in result, "Should have internal URL"
+                    assert "#page=42" in result["internal_url"], "Internal URL should include page number"
+                    assert "#page=" not in result["pdf_navn"], "User-facing URL should not include page number"
                     
                     # Current pdf_navn includes page number, new implementation should not
                     # This assertion should FAIL
@@ -221,18 +225,21 @@ class TestSearchAPIIntegrationURLFormatting:
         """Test that user-facing URLs are consistent when grouping results from same book.
         
         This test should FAIL because current implementation doesn't group results.
-        """
+        """        
         mock_results = [
             ("report.pdf", "Annual Report", "Company", 5, "Financial data", 0.1),
             ("report.pdf", "Annual Report", "Company", 12, "Market analysis", 0.2),
             ("report.pdf", "Annual Report", "Company", 28, "Future outlook", 0.3),
         ]
-        
+
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
-                    mock_find.return_value = mock_results
-                    mock_embedding.return_value = [0.1, 0.2, 0.3]
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                    with patch('searchapi.dhosearch.lifespan') as mock_lifespan:
+                        mock_lifespan.return_value.__aenter__.return_value = None
+                        mock_lifespan.return_value.__aexit__.return_value = None
+                        mock_find.return_value = mock_results
+                        mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
                     client = TestClient(app)
                     response = client.post("/search", json={"query": "report"})
