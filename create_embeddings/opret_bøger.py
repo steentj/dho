@@ -48,7 +48,7 @@ class EmbeddingProviderFactory:
 def indlæs_urls(file_path):
     """Læs URL'er fra filen."""
     with open(file_path, "r") as file:
-        return [line.strip() for line in file]
+        return [line.strip() for line in file.readlines() if line.strip()]
 
 
 async def fetch_pdf(url, session) -> fitz.Document:
@@ -88,6 +88,10 @@ def chunk_text(text, max_tokens):
     """Opdel teksten i chunks på maksimalt `max_tokens` ord."""
     # Fjern ekstra mellemrum og linjeskift
     text = re.sub(r"\s+", " ", text.strip())
+
+    if not text:
+        return []
+    
     sentences = re.split(
         r"(?<=[.!?]) +", text
     )  # Split tekst ved slutningen af sætninger
@@ -96,14 +100,34 @@ def chunk_text(text, max_tokens):
 
     for sentence in sentences:
         token_count = len(sentence.split())
-        if current_length + token_count > max_tokens:
-            yield " ".join(current_chunk)
+        
+        # If sentence is larger than max_tokens + 20%, split it
+        if token_count > max_tokens * 1.2:
+            # Yield current chunk if it has content
+            if current_chunk:
+                yield " ".join(current_chunk)
+                current_chunk = []
+                current_length = 0
+            
+            # Split the large sentence into smaller chunks
+            words = sentence.split()
+            for i in range(0, len(words), max_tokens):
+                chunk_words = words[i:i + max_tokens]
+                yield " ".join(chunk_words)
+        
+        # If adding this sentence would exceed max_tokens, yield current chunk first
+        elif current_length + token_count > max_tokens:
+            if current_chunk:
+                yield " ".join(current_chunk)
             current_chunk = [sentence]
             current_length = token_count
+        
+        # Otherwise, add sentence to current chunk
         else:
             current_chunk.append(sentence)
             current_length += token_count
 
+    # Yield any remaining content
     if current_chunk:
         yield " ".join(current_chunk)
 

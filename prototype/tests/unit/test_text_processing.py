@@ -165,7 +165,7 @@ class TestIndlæsUrls:
         
         try:
             urls = indlæs_urls(temp_path)
-            assert len(urls) == 3  # Including empty line after strip
+            assert len(urls) == 2
             assert "http://example.com/book1.pdf" in urls
             assert "http://example.com/book2.pdf" in urls
         finally:
@@ -195,7 +195,7 @@ class TestEmbeddingProviderFactory:
     
     def test_create_unknown_provider(self):
         """Test error handling for unknown provider."""
-        with pytest.raises(ValueError, match="Unknown provider: unknown"):
+        with pytest.raises(ValueError, match="Ukendt udbyder: unknown"):
             EmbeddingProviderFactory.create_provider("unknown", "test_key")
 
 
