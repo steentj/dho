@@ -228,7 +228,7 @@ class TestEmbeddingProviderFactory:
     
     def test_create_unknown_provider(self):
         """Test error handling for unknown provider type."""
-        with pytest.raises(ValueError, match="Unknown provider: unknown"):
+        with pytest.raises(ValueError, match="Ukendt udbyder: unknown"):
             EmbeddingProviderFactory.create_provider("unknown", "test_key")
     
     def test_create_provider_case_sensitivity(self):
