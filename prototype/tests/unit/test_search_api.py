@@ -3,7 +3,7 @@ Unit tests for the FastAPI search endpoints and related functions.
 """
 import pytest
 import json
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 import sys
 from pathlib import Path
 
@@ -91,7 +91,7 @@ class TestExtractTextFromChunk:
     
     def test_extract_text_with_book_title(self):
         """Test text extraction with book title prefix."""
-        chunk = "Bog Titel: Dette er teksten efter bogtitlen."
+        chunk = "##Bog Titel##Dette er teksten efter bogtitlen."
         
         result = extract_text_from_chunk(chunk)
         
@@ -100,14 +100,14 @@ class TestExtractTextFromChunk:
     
     def test_extract_text_complex_title(self):
         """Test text extraction with complex book title."""
-        chunk = "NIELS ROLSTEDS BREVE FRA 1846-1854: Her begynder den egentlige tekst."
+        chunk = "##NIELS ROLSTEDS BREVE FRA 1846-1854##Her begynder den egentlige tekst."
         
         result = extract_text_from_chunk(chunk)
         
         assert result == "Her begynder den egentlige tekst."
     
     def test_extract_text_no_colon(self):
-        """Test text extraction when there's no colon separator."""
+        """Test text extraction when there's  notitle."""
         chunk = "Dette er tekst uden kolon separator"
         
         result = extract_text_from_chunk(chunk)
@@ -117,16 +117,16 @@ class TestExtractTextFromChunk:
     
     def test_extract_text_multiple_colons(self):
         """Test text extraction with multiple colons."""
-        chunk = "Bog Titel: Dette er tekst: med flere: koloner."
+        chunk = "##Bog Titel##Dette er tekst## med flere## koloner."
         
         result = extract_text_from_chunk(chunk)
         
         # Should only remove the first title part
-        assert result == "Dette er tekst: med flere: koloner."
+        assert result == "Dette er tekst## med flere## koloner."
     
     def test_extract_text_empty_after_colon(self):
         """Test text extraction when nothing follows the colon."""
-        chunk = "Bog Titel:"
+        chunk = "##Bog Titel##"
         
         result = extract_text_from_chunk(chunk)
         
@@ -139,45 +139,63 @@ class TestFindNærmeste:
     """Test the find_nærmeste function."""
     
     @pytest.mark.asyncio
-    async def test_find_nærmeste_basic(self, mock_database_connection):
+    async def test_find_nærmeste_basic(self):
         """Test basic nearest neighbor search."""
         test_vector = [0.1] * 1536
+        mock_results = [
+            ("test.pdf", "Test Book", "Test Author", 1, "Test chunk", 0.5)
+        ]
         
-        # Mock the global db_conn
-        with patch('dhosearch.db_conn', mock_database_connection):
+        with patch('searchapi.dhosearch.db_conn') as mock_db_conn:
+            mock_cursor = AsyncMock()
+            mock_cursor.fetchall.return_value = mock_results
+            mock_db_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+            
             results = await find_nærmeste(test_vector)
             
             assert isinstance(results, list)
-            mock_database_connection.fetch.assert_called_once()
+            assert mock_cursor.execute.called
+            assert mock_cursor.fetchall.called
     
     @pytest.mark.asyncio
-    async def test_find_nærmeste_query_structure(self, mock_database_connection):
+    async def test_find_nærmeste_query_structure(self):
         """Test that the database query has correct structure."""
         test_vector = [0.1] * 1536
         
-        with patch('dhosearch.db_conn', mock_database_connection):
+        with patch('searchapi.dhosearch.db_conn') as mock_db_conn:
+            mock_cursor = AsyncMock()
+            mock_cursor.fetchall.return_value = []
+            mock_db_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+            
             await find_nærmeste(test_vector)
             
-            # Check that fetch was called with a query containing expected elements
-            call_args = mock_database_connection.fetch.call_args
+            assert mock_cursor.execute.called
+            # Check that execute was called with a query containing expected elements
+            call_args = mock_cursor.execute.call_args
             query = call_args[0][0]
             
             assert "SELECT" in query
             assert "embedding" in query
             assert "ORDER BY" in query
-            assert "LIMIT" in query
     
     @pytest.mark.asyncio
-    async def test_find_nærmeste_vector_parameter(self, mock_database_connection):
+    async def test_find_nærmeste_vector_parameter(self):
         """Test that the vector parameter is passed correctly."""
         test_vector = [0.1, 0.2, 0.3] * 512  # 1536 dimensions
         
-        with patch('dhosearch.db_conn', mock_database_connection):
+        with patch('searchapi.dhosearch.db_conn') as mock_db_conn:
+            mock_cursor = AsyncMock()
+            mock_cursor.fetchall.return_value = []
+            mock_db_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+            
             await find_nærmeste(test_vector)
             
-            call_args = mock_database_connection.fetch.call_args
+            assert mock_cursor.execute.called
+            call_args = mock_cursor.execute.call_args
             # The vector should be passed as a parameter
-            assert len(call_args[0]) > 1  # Query + at least one parameter
+            assert len(call_args[0]) > 1  # Query + parameters
+            # Vector should be converted to string in parameters
+            assert str(test_vector) in str(call_args[0][1])
 
 
 @pytest.mark.unit

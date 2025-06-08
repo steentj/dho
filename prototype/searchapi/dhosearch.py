@@ -238,7 +238,7 @@ def extract_text_from_chunk(raw_chunk: str):
     Returns:
         str: The third part of the split raw chunk.
     """
-    parts = raw_chunk.split("##")
+    parts = raw_chunk.split("##", 2)
     if len(parts) > 1:
         text = parts[2]
     else:
