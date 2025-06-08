@@ -31,8 +31,6 @@ class TestSearchAPIIntegrationDistanceThreshold:
     
     def test_search_api_uses_distance_threshold_not_limit_5(self):
         """Test that search API uses distance threshold instead of returning exactly 5 results.
-        
-        This test should FAIL because current API returns max 5 results regardless of distance.
         """
         # Mock database results with 8 results, only 3 under threshold
         mock_results = [
@@ -47,8 +45,8 @@ class TestSearchAPIIntegrationDistanceThreshold:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -70,8 +68,6 @@ class TestSearchAPIIntegrationDistanceThreshold:
     
     def test_search_api_returns_empty_when_no_results_under_threshold(self):
         """Test that API returns empty results when no matches are under threshold.
-        
-        This test should FAIL because current API will return results regardless of distance.
         """
         # All results above threshold
         mock_results = [
@@ -80,8 +76,8 @@ class TestSearchAPIIntegrationDistanceThreshold:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -91,14 +87,13 @@ class TestSearchAPIIntegrationDistanceThreshold:
                     assert response.status_code == 200
                     results = response.json()
                     
-                    # This should FAIL because current implementation returns all results
                     assert len(results) == 0, f"Expected 0 results when all distances > threshold, got {len(results)}"
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI app not available")
 class TestSearchAPIIntegrationResultGrouping:
-    """Integration tests for result grouping by book - these should FAIL initially."""
+    """Integration tests for result grouping by book"""
     
     def test_search_api_groups_multiple_chunks_from_same_book(self):
         """Test that API groups multiple chunks from the same book into one result.
@@ -115,8 +110,8 @@ class TestSearchAPIIntegrationResultGrouping:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -143,8 +138,6 @@ class TestSearchAPIIntegrationResultGrouping:
     
     def test_search_api_includes_page_information_for_grouped_results(self):
         """Test that grouped results include page information.
-        
-        This test should FAIL because current API doesn't track multiple pages per result.
         """
         mock_results = [
             ("manual.pdf", "User Manual", "Tech Writer", 12, "Setup instructions", 0.1),
@@ -153,8 +146,8 @@ class TestSearchAPIIntegrationResultGrouping:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -181,12 +174,10 @@ class TestSearchAPIIntegrationResultGrouping:
 @pytest.mark.integration
 @pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI app not available")
 class TestSearchAPIIntegrationURLFormatting:
-    """Integration tests for URL formatting - these should FAIL initially."""
+    """Integration tests for URL formatting"""
     
     def test_search_api_provides_separate_user_and_internal_urls(self):
         """Test that API provides both user-facing and internal URLs.
-        
-        This test should FAIL because current API only provides pdf_navn with page numbers.
         """
         mock_results = [
             ("document.pdf", "Important Document", "Author", 42, "Document content", 0.1),
@@ -273,8 +264,8 @@ class TestSearchAPIIntegrationChunkConcatenation:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -302,8 +293,6 @@ class TestSearchAPIIntegrationChunkConcatenation:
     
     def test_search_api_includes_page_info_in_concatenated_chunks(self):
         """Test that concatenated chunks include page information.
-        
-        This test should FAIL because current API doesn't format chunks with page info.
         """
         mock_results = [
             ("manual.pdf", "Software Manual", "Dev Team", 15, "Installation steps", 0.1),
@@ -311,8 +300,8 @@ class TestSearchAPIIntegrationChunkConcatenation:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -334,12 +323,10 @@ class TestSearchAPIIntegrationChunkConcatenation:
 @pytest.mark.integration
 @pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI app not available")
 class TestSearchAPIIntegrationResponseStructure:
-    """Integration tests for new response structure - these should FAIL initially."""
+    """Integration tests for new response structure"""
     
     def test_search_api_response_has_new_fields(self):
         """Test that API response includes all new fields for grouped results.
-        
-        This test should FAIL because current API response doesn't have these fields.
         """
         mock_results = [
             ("book.pdf", "Test Book", "Test Author", 1, "First chunk", 0.1),
@@ -347,8 +334,8 @@ class TestSearchAPIIntegrationResponseStructure:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -381,16 +368,14 @@ class TestSearchAPIIntegrationResponseStructure:
     
     def test_search_api_response_backwards_compatibility(self):
         """Test that API response maintains backwards compatibility with existing fields.
-        
-        This test should PASS because basic fields should still exist.
         """
         mock_results = [
             ("book.pdf", "Test Book", "Test Author", 1, "Test chunk", 0.1),
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -415,9 +400,7 @@ class TestSearchAPIIntegrationEndToEnd:
     """End-to-end integration tests for the complete new behavior."""
     
     def test_complete_search_workflow_with_new_behavior(self):
-        """Test the complete search workflow with all new features combined.
-        
-        This test should FAIL because it tests all the new behaviors together.
+        """Test the complete search workflow with all new features combined.        
         """
         # Complex scenario: multiple books, multiple chunks per book, mixed distances
         mock_results = [
@@ -432,8 +415,8 @@ class TestSearchAPIIntegrationEndToEnd:
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('dhosearch.find_nærmeste') as mock_find:
-                with patch('dhosearch.get_embedding') as mock_embedding:
+            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
