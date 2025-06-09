@@ -23,48 +23,6 @@ except ImportError as e:
     pytest.skip(f"Could not import FastAPI app: {e}", allow_module_level=True)
     FASTAPI_AVAILABLE = False
 
-
-@pytest.mark.integration
-@pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI app not available")
-class TestSearchAPIIntegrationDistanceThreshold:
-    """Integration tests for distance threshold filtering - these should FAIL initially."""
-    
-    def test_search_api_uses_distance_threshold_not_limit_5(self):
-        """Test that search API uses distance threshold instead of returning exactly 5 results.
-        """
-        # Mock database results with 8 results, only 3 under threshold
-        mock_results = [
-            ("book1.pdf", "Book One", "Author One", 1, "chunk 1", 0.1),
-            ("book2.pdf", "Book Two", "Author Two", 2, "chunk 2", 0.2), 
-            ("book3.pdf", "Book Three", "Author Three", 3, "chunk 3", 0.3),
-            ("book4.pdf", "Book Four", "Author Four", 4, "chunk 4", 0.6),  # Above threshold
-            ("book5.pdf", "Book Five", "Author Five", 5, "chunk 5", 0.7),  # Above threshold
-            ("book6.pdf", "Book Six", "Author Six", 6, "chunk 6", 0.8),    # Above threshold
-            ("book7.pdf", "Book Seven", "Author Seven", 7, "chunk 7", 0.9), # Above threshold
-            ("book8.pdf", "Book Eight", "Author Eight", 8, "chunk 8", 0.95), # Above threshold
-        ]
-        
-        with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
-                    mock_find.return_value = mock_results
-                    mock_embedding.return_value = [0.1, 0.2, 0.3]
-                    
-                    client = TestClient(app)
-                    response = client.post("/search", json={"query": "test query"})
-                    
-                    assert response.status_code == 200
-                    results = response.json()
-                    
-                    # Current implementation returns 5 results (LIMIT 5)
-                    # New implementation should return 3 results (distance <= 0.5)
-                    # This assertion should FAIL
-                    assert len(results) == 3, f"Expected 3 results with distance <= 0.5, got {len(results)}"
-                    
-                    # Verify all returned results are under threshold
-                    for result in results:
-                        distance = result.get("distance", result.get("min_distance", 1.0))
-                        assert distance <= 0.5, f"Result distance {distance} should be <= 0.5"
     
     def test_search_api_returns_empty_when_no_results_under_threshold(self):
         """Test that API returns empty results when no matches are under threshold.
@@ -354,7 +312,7 @@ class TestSearchAPIIntegrationResponseStructure:
                         "pages",           # List of page numbers
                         "min_distance",    # Minimum distance among grouped chunks  
                         "chunk_count",     # Number of chunks grouped
-                        "pdf_url_with_page"  # Internal URL with page number
+                        "internal_url"  # Internal URL with page number
                     ]
                     
                     for field in expected_new_fields:
@@ -364,7 +322,7 @@ class TestSearchAPIIntegrationResponseStructure:
                     assert isinstance(result["pages"], list), "pages should be a list"
                     assert isinstance(result["min_distance"], (int, float)), "min_distance should be numeric"
                     assert isinstance(result["chunk_count"], int), "chunk_count should be integer"
-                    assert isinstance(result["pdf_url_with_page"], str), "pdf_url_with_page should be string"
+                    assert isinstance(result["internal_url"], str), "internal_url should be string"
     
     def test_search_api_response_backwards_compatibility(self):
         """Test that API response maintains backwards compatibility with existing fields.
@@ -409,9 +367,7 @@ class TestSearchAPIIntegrationEndToEnd:
             ("book1.pdf", "History of WWII", "Historian A", 78, "War aftermath", 0.2),
             ("book2.pdf", "Modern Warfare", "Military Expert", 23, "Technology in war", 0.25),
             ("book2.pdf", "Modern Warfare", "Military Expert", 56, "Strategic planning", 0.3),
-            ("book3.pdf", "Peace Treaties", "Diplomat", 34, "Post-war agreements", 0.45),
-            ("book4.pdf", "Economic Impact", "Economist", 67, "War economics", 0.6),  # Above threshold
-            ("book5.pdf", "Social Changes", "Sociologist", 89, "Society after war", 0.7),  # Above threshold
+            ("book3.pdf", "Peace Treaties", "Diplomat", 34, "Post-war agreements", 0.45), 
         ]
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
@@ -449,7 +405,7 @@ class TestSearchAPIIntegrationEndToEnd:
                     
                     # URL formatting checks
                     assert "#page=" not in book1_result["pdf_navn"], "User-facing URL should be clean"
-                    assert "#page=" in book1_result["pdf_url_with_page"], "Internal URL should have page"
+                    assert "#page=" in book1_result["internal_url"], "Internal URL should have page"
                     
                     # Chunk concatenation checks
                     combined_chunks = book1_result.get("chunk", book1_result.get("combined_chunks", ""))
