@@ -63,9 +63,11 @@ class BookProcessorWrapper:
         """Wrapper around existing process_book with monitoring"""
         try:
             # Use EXISTING process_book function unchanged
-            await process_book(book_url, chunk_size, pool, session, embedding_provider)
+            result = await process_book(book_url, chunk_size, pool, session, embedding_provider)
+            if result is None:  # PDF fetch failed or other critical error
+                raise Exception("Could not process book - PDF fetch failed or other critical error")
             self.processed_count += 1
-            logging.info(f"✓ Bog behandlet eller sprunget over (findes allerede): {book_url}")
+            logging.info(f"✓ Bog behandlet: {book_url}")
             
         except Exception as e:
             self.failed_count += 1
@@ -122,8 +124,12 @@ class BookProcessorWrapper:
                 host=db_host, database=database, user=db_user, password=db_password
             ) as pool:
                 ssl_context = ssl.create_default_context()
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
                 async with aiohttp.ClientSession(
-                    connector=TCPConnector(ssl=ssl_context)
+                    connector=TCPConnector(ssl=ssl_context),
+                    headers=headers
                 ) as session:
                     
                     # Use EXISTING semaphore pattern  

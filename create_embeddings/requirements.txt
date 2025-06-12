@@ -9,3 +9,5 @@ tqdm
 flask
 uvicorn
 fastapi
+aiohttp
+asyncpg

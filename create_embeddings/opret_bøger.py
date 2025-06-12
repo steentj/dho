@@ -242,7 +242,7 @@ async def process_book(book_url, chunk_size, pool, session, embedding_provider):
                 logging.warning(f"Kunne ikke hente PDF fra {book_url}")
                 
     except Exception as e:
-        logging.exception(f"Fejl ved behandling af {book_url}: {e}")
+        logging.exception(f"Fejl ved behandling af {book_url}: {type(e).__name__}")
 
 
 async def main():
@@ -294,7 +294,7 @@ async def main():
                         "Poolen lukkede ikke inden for timeout-perioden (60 sekunder)"
                     )
     except Exception as e:
-        logging.exception(f"Fatal fejl i hovedprogrammet: {e}")
+        logging.exception(f"Fatal fejl i hovedprogrammet: {type(e).__name__}")
 
 
 async def semaphore_guard(coro, semaphore, *args):

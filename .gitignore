@@ -32,3 +32,8 @@ markdown/
 *.tar
 *.bak
 *.log
+
+# Book processing output folders
+prototype/book_failed/
+prototype/book_input/
+prototype/book_output/
