@@ -1,7 +1,7 @@
 # Testing Plan for Issue #3: Create Unit and Integration Tests
 
 ## Overview
-This plan details the implementation of comprehensive testing for the semantic search prototype, including both unit tests (with mocks) and integration tests for the embedding creation and search API components.
+This plan details the implementation of comprehensive testing for the semantic search soegemaskine, including both unit tests (with mocks) and integration tests for the embedding creation and search API components.
 
 ## Current Architecture Analysis
 
@@ -13,7 +13,7 @@ This plan details the implementation of comprehensive testing for the semantic s
    - Database storage operations
    - EmbeddingProvider abstraction (already exists)
 
-2. **Search API (`prototype/searchapi/dhosearch.py`)**
+2. **Search API (`soegemaskine/searchapi/dhosearch.py`)**
    - FastAPI endpoints
    - Search request parsing
    - Embedding generation for search queries
@@ -30,7 +30,7 @@ This plan details the implementation of comprehensive testing for the semantic s
 ### Phase 1: Setup Testing Infrastructure
 
 #### 1.1 Create Test Dependencies File
-- **File**: `prototype/requirements-dev.txt`
+- **File**: `soegemaskine/requirements-dev.txt`
 - **Content**: Testing frameworks and dependencies
   ```
   pytest
@@ -44,7 +44,7 @@ This plan details the implementation of comprehensive testing for the semantic s
 
 #### 1.2 Create Test Directory Structure
 ```
-prototype/
+soegemaskine/
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py          # Pytest configuration and fixtures

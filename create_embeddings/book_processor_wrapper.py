@@ -63,9 +63,8 @@ class BookProcessorWrapper:
         """Wrapper around existing process_book with monitoring"""
         try:
             # Use EXISTING process_book function unchanged
-            result = await process_book(book_url, chunk_size, pool, session, embedding_provider)
-            if result is None:  # PDF fetch failed or other critical error
-                raise Exception("Could not process book - PDF fetch failed or other critical error")
+            await process_book(book_url, chunk_size, pool, session, embedding_provider)
+            
             self.processed_count += 1
             logging.info(f"✓ Bog behandlet: {book_url}")
             

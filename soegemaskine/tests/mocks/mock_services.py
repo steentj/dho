@@ -1,5 +1,5 @@
 """
-Mock services for comprehensive testing of the semantic search prototype.
+Mock services for comprehensive testing of the semantic search.
 
 Provides fully functional mock implementations of external services used in testing.
 """

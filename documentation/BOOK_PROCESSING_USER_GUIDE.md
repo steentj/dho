@@ -143,10 +143,10 @@ Når du bruger Docker, gemmes logs automatisk til `book_output/` mappen på din 
 
 ```bash
 # Vis seneste log fil
-ls -t prototype/book_output/opret_bøger_*.log | head -1 | xargs cat
+ls -t soegemaskine/book_output/opret_bøger_*.log | head -1 | xargs cat
 
 # Følg realtids behandling (i en anden terminal)
-tail -f prototype/book_output/$(ls -t prototype/book_output/opret_bøger_*.log | head -1)
+tail -f soegemaskine/book_output/$(ls -t soegemaskine/book_output/opret_bøger_*.log | head -1)
 ```
 
 ## Kommando Reference
@@ -189,7 +189,7 @@ Tjekker at alle påkrævede miljøvariabler er sat og viser nuværende konfigura
 Når du kører bogbehandleren, organiseres filer som følger:
 
 ```
-prototype/
+soegemaskine/
 ├── book_input/           # Input filer (dine bog URL lister)
 ├── book_output/          # Behandlings logs og status
 │   ├── processing_status.json
@@ -361,7 +361,7 @@ Alle filer forbliver på din værtsmaskine i disse placeringer:
 /sti/til/SlægtBib/src/
 ├── mine_boeger.txt                 # Din input fil (du opretter denne)
 ├── scripts/process_books.sh        # Scriptet du kører
-└── prototype/
+└── soegemaskine/
     ├── book_input/                 # Input filer (auto-oprettet)
     ├── book_output/                # Resultater du kan se
     │   ├── processing_status.json  # Status fil
@@ -510,7 +510,7 @@ docker --version
 docker-compose --version
 
 # Tjek at din .env fil eksisterer
-ls -la prototype/.env
+ls -la soegemaskine/.env
 
 # Valider konfiguration
 ./scripts/process_books.sh --validate
@@ -545,7 +545,7 @@ scp mine_boeger.txt bruger@server:/sti/til/SlægtBib/src/
 ssh bruger@server "cd /sti/til/SlægtBib/src && ./scripts/process_books.sh --file mine_boeger.txt"
 
 # Kopier resultater tilbage (valgfrit)
-scp bruger@server:/sti/til/SlægtBib/src/prototype/book_output/* ./resultater/
+scp bruger@server:/sti/til/SlægtBib/src/soegemaskine/book_output/* ./resultater/
 ```
 
 ## Nøgle Fordele ved Denne Docker Tilgang

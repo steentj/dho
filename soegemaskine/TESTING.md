@@ -1,6 +1,6 @@
-# Testing Guide for Semantic Search Prototype
+# Testing Guide for Semantic Search
 
-This document describes how to run and develop tests for the semantic search prototype.
+This document describes how to run and develop tests for the semantic search.
 
 ## Overview
 

@@ -1,5 +1,5 @@
 """
-Shared test fixtures and configuration for the semantic search prototype tests.
+Shared test fixtures and configuration for the semantic search tests.
 """
 import pytest
 import asyncio

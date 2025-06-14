@@ -1,5 +1,5 @@
 """
-Mock services for testing the semantic search prototype.
+Mock services for testing the semantic search.
 """
 from unittest.mock import AsyncMock, MagicMock
 from typing import List, Dict, Any
@@ -118,7 +118,7 @@ def create_mock_fastapi_app():
         
         @app.get("/")
         async def root():
-            return {"Hej": "Dette er Dansk Historie Online: Semantisk søgning API - prototype"}
+            return {"Hej": "Dette er Dansk Historie Online: Semantisk søgning API"}
         
         @app.post("/search")
         async def search(request: dict):

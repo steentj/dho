@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-cd "$PROJECT_ROOT/prototype"
+cd "$PROJECT_ROOT/soegemaskine"
 
 # Create necessary directories
 mkdir -p book_input book_output book_failed

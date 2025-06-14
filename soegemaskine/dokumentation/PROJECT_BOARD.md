@@ -1,4 +1,4 @@
-# Semantic Search Prototype: Improvement Project Board
+# Semantic Search: Improvement Project Board
 
 ## To Do
 

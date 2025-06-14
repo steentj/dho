@@ -37,7 +37,7 @@ En moderne, brugervenlig web-baseret GUI til test af den semantiske søge API ge
 
 3. **Kontrollér at nginx containeren kører:**
    ```bash
-   # Fra prototype mappen
+   # Fra soegemaskine mappen
    docker-compose ps
    # Nginx skal køre på port 8080
    ```
@@ -193,6 +193,6 @@ For at bidrage til projektet:
 
 ---
 
-**Udviklet som del af Dansk Historie Online - Semantisk Søgning Prototype**
+**Udviklet som del af Dansk Historie Online - Semantisk Søgning **
 
 For spørgsmål eller problemer, kontakt projektteamet.

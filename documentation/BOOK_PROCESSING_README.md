@@ -66,7 +66,7 @@ create_embeddings/
 ├── Dockerfile                # Container definition
 └── .env.template             # Environment variables template
 
-prototype/
+soegemaskine/
 ├── docker-compose.yml        # Updated with book-processor service
 ├── book_input/               # Input files (created when first used)
 ├── book_output/              # Processing logs and status

@@ -1,4 +1,4 @@
-# Makefile for Semantic Search Prototype Development and Testing
+# Makefile for Semantic Search soegemaskine Development and Testing
 
 .PHONY: help install test test-unit test-integration test-coverage clean lint format docker-test
 

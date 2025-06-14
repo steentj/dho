@@ -8,8 +8,8 @@ Filerne er organiseret i 2 foldere:
   - opdeler teksten i chunks
   - laver embeddings med OpenAI api for chunks
   - gemmer i Postgres database 
-- __prototype__: Webside til søgning
+- __soegemaskine__: Webside til søgning
   - Lader brugeren indtaste søgning og finder de semantisk bedste resultater
-  - Prototypen opsættes i 3 Docker containers.
+  - soegemaskinen opsættes i 3 Docker containers.
 
-Under prototype ligger en folder __dokumentation__ med en yderligere information  
+Under soegemaskine ligger en folder __dokumentation__ med en yderligere information  

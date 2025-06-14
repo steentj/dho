@@ -34,6 +34,6 @@ markdown/
 *.log
 
 # Book processing output folders
-prototype/book_failed/
-prototype/book_input/
-prototype/book_output/
+soegemaskine/book_failed/
+soegemaskine/book_input/
+soegemaskine/book_output/

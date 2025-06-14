@@ -1,4 +1,4 @@
-name: Test Semantic Search Prototype
+name: Test Semantic Search 
 
 on:
   push:

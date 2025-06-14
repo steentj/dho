@@ -22,7 +22,7 @@ echo "🐳 Checking if API server is accessible..."
 if ! curl -s http://localhost:8080 > /dev/null; then
     echo "⚠️  Warning: API server not accessible at localhost:8080"
     echo "   Make sure Docker containers are running:"
-    echo "   cd ../prototype && docker-compose up -d"
+    echo "   cd ../soegemaskine && docker-compose up -d"
 fi
 
 # Launch the GUI

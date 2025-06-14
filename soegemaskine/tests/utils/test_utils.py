@@ -1,5 +1,5 @@
 """
-Utility functions for testing the semantic search prototype.
+Utility functions for testing the semantic search .
 
 Provides common test data, helper functions, and utilities used across test files.
 """

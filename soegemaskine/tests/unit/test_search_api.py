@@ -212,12 +212,12 @@ class TestAPIEndpoints:
     def test_root_endpoint_response(self):
         """Test the root endpoint response structure."""
         expected_response = {
-            "Hej": "Dette er Dansk Historie Online: Semantisk søgning API - prototype"
+            "Hej": "Dette er Dansk Historie Online: Semantisk søgning API"
         }
         
         # This would be tested with TestClient in a full implementation
         assert "Hej" in expected_response
-        assert "prototype" in expected_response["Hej"]
+        assert "Semantisk" in expected_response["Hej"]
     
     def test_search_endpoint_input_validation(self):
         """Test search endpoint input validation."""

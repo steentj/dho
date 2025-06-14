@@ -31,7 +31,7 @@ The search page is deployed on a Linux server in 3 Docker containers:
 2. A container named "dhosearch" which an Python FastAPI app. It has two API's:
 	1. A GET api in the root("/") which is just to give a Alive check
 	2. A POST api ("/search/") taking the same parameters (query, chunk_size, distance_function) that the user may input on the web page. The container exposes port 8000 for access.
-3. A container named "prototype-nginx-1" with a NGINX server. The server is the only accessible entry to the system. It serves the HTML page and functions also a reverse proxy to the API in the dhosearch container. It exposes the port 8080 for outside access to the web page.
+3. A container named "nginx-1" with a NGINX server. The server is the only accessible entry to the system. It serves the HTML page and functions also a reverse proxy to the API in the dhosearch container. It exposes the port 8080 for outside access to the web page.
 
 
 ![Docker network](dockernetwork.png)
