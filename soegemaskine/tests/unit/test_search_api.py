@@ -3,7 +3,7 @@ Unit tests for the FastAPI search endpoints and related functions.
 """
 import pytest
 import json
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 import sys
 from pathlib import Path
 
@@ -146,56 +146,52 @@ class TestFindNærmeste:
             ("test.pdf", "Test Book", "Test Author", 1, "Test chunk", 0.5)
         ]
         
-        with patch('searchapi.dhosearch.db_conn') as mock_db_conn:
-            mock_cursor = AsyncMock()
-            mock_cursor.fetchall.return_value = mock_results
-            mock_db_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+        with patch('searchapi.dhosearch.db_service') as mock_db_service:
+            mock_db_service.vector_search.return_value = mock_results
             
             results = await find_nærmeste(test_vector)
             
             assert isinstance(results, list)
-            assert mock_cursor.execute.called
-            assert mock_cursor.fetchall.called
+            mock_db_service.vector_search.assert_called_once_with(
+                embedding=test_vector,
+                limit=1000,
+                distance_function="cosine",
+                chunk_size="normal"
+            )
     
     @pytest.mark.asyncio
     async def test_find_nærmeste_query_structure(self):
         """Test that the database query has correct structure."""
         test_vector = [0.1] * 1536
         
-        with patch('searchapi.dhosearch.db_conn') as mock_db_conn:
-            mock_cursor = AsyncMock()
-            mock_cursor.fetchall.return_value = []
-            mock_db_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+        with patch('searchapi.dhosearch.db_service') as mock_db_service:
+            mock_db_service.vector_search.return_value = []
             
             await find_nærmeste(test_vector)
             
-            assert mock_cursor.execute.called
-            # Check that execute was called with a query containing expected elements
-            call_args = mock_cursor.execute.call_args
-            query = call_args[0][0]
-            
-            assert "SELECT" in query
-            assert "embedding" in query
-            assert "ORDER BY" in query
+            mock_db_service.vector_search.assert_called_once_with(
+                embedding=test_vector,
+                limit=1000,
+                distance_function="cosine",
+                chunk_size="normal"
+            )
     
     @pytest.mark.asyncio
     async def test_find_nærmeste_vector_parameter(self):
         """Test that the vector parameter is passed correctly."""
         test_vector = [0.1, 0.2, 0.3] * 512  # 1536 dimensions
         
-        with patch('searchapi.dhosearch.db_conn') as mock_db_conn:
-            mock_cursor = AsyncMock()
-            mock_cursor.fetchall.return_value = []
-            mock_db_conn.cursor.return_value.__aenter__.return_value = mock_cursor
+        with patch('searchapi.dhosearch.db_service') as mock_db_service:
+            mock_db_service.vector_search.return_value = []
             
             await find_nærmeste(test_vector)
             
-            assert mock_cursor.execute.called
-            call_args = mock_cursor.execute.call_args
-            # The vector should be passed as a parameter
-            assert len(call_args[0]) > 1  # Query + parameters
-            # Vector should be converted to string in parameters
-            assert str(test_vector) in str(call_args[0][1])
+            mock_db_service.vector_search.assert_called_once_with(
+                embedding=test_vector,
+                limit=1000,
+                distance_function="cosine",
+                chunk_size="normal"
+            )
 
 
 @pytest.mark.unit

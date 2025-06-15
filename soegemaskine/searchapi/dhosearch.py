@@ -1,12 +1,14 @@
-from psycopg import AsyncConnection
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from typing import List
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Import our new dependency injection system
+from database import PostgreSQLService
 
 # Load environment variables first
 load_dotenv()
@@ -30,17 +32,26 @@ class SearchResponse(BaseModel):
     
 # Alternative: use List[SearchResult] directly as response model
 
-db_conn = None
+# Global service instance  
+db_service = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    databaseurl = os.getenv("DATABASE_URL", None)
-    global db_conn
-    db_conn= await AsyncConnection.connect(databaseurl)
-    print("Opstart: Databasen er forbundet")
+    """Application lifespan manager using dependency injection."""
+    global db_service
+    
+    # Initialize PostgreSQL service with dependency injection
+    database_url = os.getenv("DATABASE_URL", None)
+    db_service = PostgreSQLService(database_url)
+    await db_service.connect()
+    print("Opstart: Database service connected using dependency injection")
+    
     yield
-    await db_conn.close()
-    print("Luk ned: Databasen er frakoblet")
+    
+    # Cleanup
+    await db_service.disconnect()
+    print("Luk ned: Database service disconnected")
+    db_service = None
 
 app = FastAPI(lifespan=lifespan)
 
@@ -188,38 +199,45 @@ def create_response_format(grouped_results: dict) -> list:
     
     return response
 
-async def find_nærmeste(vektor: list,) -> list:
+async def find_nærmeste(vektor: list) -> list:
+    """
+    Find nearest vectors using dependency injection.
+    
+    Args:
+        vektor: Query embedding vector
+        
+    Returns:
+        List of search results from database as tuples
+    """
     try:
         # Get distance threshold from environment variable
         distance_threshold = float(os.getenv("DISTANCE_THRESHOLD", "0.5"))
         
-        async with db_conn.cursor() as cur:
-
-                # Supported distance functions are:
-                #     <-> - L2 distance (Euclidean)
-                #     <#> - (negative) inner product
-                #     <=> - cosine distance
-                #     <+> - L1 distance (Manhattan)
+        # Use our dependency injection service for vector search
+        # Get more results than needed so we can filter by distance threshold
+        results = await db_service.vector_search(
+            embedding=vektor,
+            limit=1000,  # Get more results to allow for filtering
+            distance_function="cosine",  # corresponds to <=> operator
+            chunk_size="normal"  # corresponds to "chunks" table
+        )
+        
+        # Filter results by distance threshold and minimum chunk length
+        filtered_results = []
+        for result in results:
+            # result is a tuple: (pdf_navn, titel, forfatter, sidenr, chunk, distance)
+            if len(result) >= 6:
+                pdf_navn, titel, forfatter, sidenr, chunk, distance = result[:6]
                 
-                tabel = "chunks"
-
-                distance_operator = "<=>"
-                vektorString = str(vektor)
-
-                sql = f"SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, embedding {distance_operator} %s AS distance " \
-                f"FROM books b inner join {tabel} c on b.id = c.book_id " \
-                f"WHERE length(trim(c.chunk)) > 20 AND embedding {distance_operator} %s <= %s " \
-                f"ORDER BY embedding {distance_operator} %s ASC"
-
-                await cur.execute(sql, (vektorString, vektorString, distance_threshold, vektorString),)
-
-                results = await cur.fetchall()
-                
+                # Apply the same filters as the original code
+                if len(chunk.strip()) > 20 and distance <= distance_threshold:
+                    filtered_results.append(result)
+                    
+        return filtered_results
+        
     except Exception as e:
         print(f"Fejl ved indlæsning af databasen: {e}")
-        results = []
-
-    return results
+        return []
 
 def get_embedding(text, client, model="text-embedding-3-small"):
     text = text.replace("\n", " ")
