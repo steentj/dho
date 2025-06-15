@@ -17,6 +17,12 @@ from .postgresql import (
     PostgreSQLSearchRepository,
     PostgreSQLDatabaseFactory
 )
+from .postgresql_service import (
+    PostgreSQLService,
+    BookService,
+    create_postgresql_service,
+    create_book_service
+)
 
 __all__ = [
     # Interfaces
@@ -34,4 +40,10 @@ __all__ = [
     "PostgreSQLBookRepository", 
     "PostgreSQLSearchRepository",
     "PostgreSQLDatabaseFactory",
+    
+    # Service layer
+    "PostgreSQLService",
+    "BookService",
+    "create_postgresql_service",
+    "create_book_service",
 ]

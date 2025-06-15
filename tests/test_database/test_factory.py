@@ -2,7 +2,7 @@
 Unit tests for database factory.
 """
 import pytest
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import patch, AsyncMock
 from database.factory import DatabaseFactoryRegistry, create_database_factory
 from database.interfaces import DatabaseFactory
 from database.postgresql import PostgreSQLDatabaseFactory
