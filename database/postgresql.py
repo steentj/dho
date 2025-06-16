@@ -67,8 +67,8 @@ class PostgreSQLConnection(DatabaseConnection):
     @asynccontextmanager
     async def transaction(self):
         """Context manager for database transactions."""
-        async with self._connection.transaction():
-            yield
+        async with self._connection.transaction() as transaction:
+            yield transaction
 
 
 class PostgreSQLBookRepository(BookRepository):

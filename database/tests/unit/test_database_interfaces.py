@@ -81,9 +81,15 @@ class TestPostgreSQLConnection:
     @pytest.mark.asyncio
     async def test_transaction(self, postgres_connection, mock_asyncpg_connection):
         """Test transaction context manager."""
+        # Create a proper async context manager for transaction
+        mock_transaction_cm = AsyncMock()
         mock_transaction = AsyncMock()
-        mock_asyncpg_connection.transaction.return_value.__aenter__.return_value = mock_transaction
-        mock_asyncpg_connection.transaction.return_value.__aexit__.return_value = None
+        mock_transaction_cm.__aenter__.return_value = mock_transaction
+        mock_transaction_cm.__aexit__.return_value = None
+        
+        # Override the transaction method with a regular method (not a coroutine)
+        from unittest.mock import MagicMock
+        mock_asyncpg_connection.transaction = MagicMock(return_value=mock_transaction_cm)
         
         async with postgres_connection.transaction() as trans:
             assert trans is not None
@@ -161,9 +167,16 @@ class TestPostgreSQLBookRepository:
             (2, "Second chunk", [0.4, 0.5, 0.6])
         ]
         
+        # Create a proper async context manager for transaction
+        mock_transaction_cm = AsyncMock()
         mock_transaction = AsyncMock()
-        mock_connection.transaction.return_value.__aenter__.return_value = mock_transaction
-        mock_connection.transaction.return_value.__aexit__.return_value = None
+        mock_transaction_cm.__aenter__.return_value = mock_transaction
+        mock_transaction_cm.__aexit__.return_value = None
+        
+        # Override the transaction method with a regular method (not a coroutine)
+        # that returns our mock context manager
+        from unittest.mock import MagicMock
+        mock_connection.transaction = MagicMock(return_value=mock_transaction_cm)
         
         await book_repository.save_chunks(123, chunks_data)
         
