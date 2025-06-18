@@ -88,7 +88,7 @@ def extract_text_by_page(pdf) -> dict:
     return pages_text
 
 
-def chunk_text(text, max_tokens):
+def chunk_text(text, max_tokens, title=None):
     """Opdel teksten i chunks på maksimalt `max_tokens` ord."""
     # Fjern ekstra mellemrum og linjeskift
     text = re.sub(r"\s+", " ", text.strip())
@@ -117,12 +117,12 @@ def chunk_text(text, max_tokens):
             words = sentence.split()
             for i in range(0, len(words), max_tokens):
                 chunk_words = words[i:i + max_tokens]
-                yield " ".join(chunk_words)
-        
+                yield " ".join(add_title_to_chunk(chunk_words, title))
+
         # If adding this sentence would exceed max_tokens, yield current chunk first
         elif current_length + token_count > max_tokens:
             if current_chunk:
-                yield " ".join(current_chunk)
+                yield " ".join(add_title_to_chunk(current_chunk, title))
             current_chunk = [sentence]
             current_length = token_count
         
@@ -133,9 +133,13 @@ def chunk_text(text, max_tokens):
 
     # Yield any remaining content
     if current_chunk:
-        yield " ".join(current_chunk)
+        yield " ".join(add_title_to_chunk(current_chunk, title))
 
-
+def add_title_to_chunk(chunk, title) -> str:
+    """Tilføj bogtitel til chunk, hvis den ikke allerede er der."""
+    if title:
+        return f"##{title}##{chunk}"
+    return chunk
 # async def get_embedding(chunk, openai_client, model=MODEL):
 #     """Generer embedding for en tekst-chunk."""
 #     response = await openai_client.embeddings.create(input=chunk, model=model)
@@ -198,11 +202,10 @@ async def parse_book(pdf, book_url, chunk_size, embedding_provider):
         pdf_pages = extract_text_by_page(pdf)
 
         for page_num, page_text in pdf_pages.items():
-            for chunk in chunk_text(page_text, chunk_size):
+            for chunk in chunk_text(page_text, chunk_size, book["titel"]):
                 if chunk.strip():  # Ignorer tomme chunks
-                    chunk_with_metadata = f"##{book['titel']}##{chunk}"
-                    book["chunks"].append((page_num, chunk_with_metadata))
-                    embedding = await embedding_provider.get_embedding(chunk_with_metadata)
+                    book["chunks"].append((page_num, chunk))
+                    embedding = await embedding_provider.get_embedding(chunk)
                     book["embeddings"].append(embedding)
     finally:
         pdf.close()  # Luk PDF for at frigøre ressourcer
