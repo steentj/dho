@@ -4,6 +4,7 @@ PostgreSQL service layer for DHO Semantic Search System.
 This service provides high-level database operations using the dependency injection
 infrastructure while maintaining compatibility with existing application code.
 """
+
 import logging
 from typing import List, Tuple, Optional, Dict, Any
 from contextlib import asynccontextmanager

@@ -11,7 +11,8 @@ import logging
 from opret_bøger import (
     indlæs_urls,
     process_book,
-    EmbeddingProviderFactory
+    EmbeddingProviderFactory,
+    ChunkingStrategyFactory
 )
 from logging_config import setup_logging
 
@@ -59,15 +60,12 @@ class BookProcessorWrapper:
                 json.dump(self.failed_books, f, indent=2)
     
     async def process_single_book_with_monitoring(self, book_url: str, chunk_size: int, 
-                                                  pool, session, embedding_provider):
-        """Wrapper around existing process_book with monitoring"""
+                                                  pool, session, embedding_provider, chunking_strategy):
+        """Wrapper around existing process_book with monitoring, now with injectable chunking strategy"""
         try:
-            # Use EXISTING process_book function unchanged
-            await process_book(book_url, chunk_size, pool, session, embedding_provider)
-            
+            await process_book(book_url, chunk_size, pool, session, embedding_provider, chunking_strategy)
             self.processed_count += 1
             logging.info(f"✓ Bog behandlet: {book_url}")
-            
         except Exception as e:
             self.failed_count += 1
             self.failed_books.append({
@@ -76,49 +74,34 @@ class BookProcessorWrapper:
                 "timestamp": datetime.now().isoformat()
             })
             logging.error(f"✗ Fejl ved behandling af {book_url}: {e}")
-        
-        # Update status after each book
         self.update_status()
     
     async def process_books_from_file(self, input_file: str):
-        """Process books using existing opret_bøger logic with monitoring"""
-        # Use existing URL loading function
+        """Process books using existing opret_bøger logic with monitoring and injectable chunking strategy"""
         input_file_path = Path("/app/input") / input_file
-        
         if not input_file_path.exists():
             raise FileNotFoundError(f"Inputfil ikke fundet: {input_file_path}")
-        
-        # Use EXISTING indlæs_urls function
         book_urls = indlæs_urls(str(input_file_path))
         self.total_count = len(book_urls)
-        
         logging.info(f"Behandler {self.total_count} bøger ved hjælp af eksisterende opret_bøger logik")
-        
-        # Use EXISTING environment setup
         from dotenv import load_dotenv
         load_dotenv(override=True)
-        
         database = os.getenv("POSTGRES_DB")
         db_user = os.getenv("POSTGRES_USER") 
         db_password = os.getenv("POSTGRES_PASSWORD")
         api_key = os.getenv("OPENAI_API_KEY")
         provider = os.getenv("PROVIDER")
         chunk_size = int(os.getenv("CHUNK_SIZE", "500"))
-        
-        # Use EXISTING embedding provider factory
+        chunking_strategy_name = os.getenv("CHUNKING_STRATEGY", "sentence_splitter")
         embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
-        
+        chunking_strategy = ChunkingStrategyFactory.create_strategy(chunking_strategy_name)
         self.update_status("starter")
-        
-        # Use EXISTING database and session setup pattern
         import asyncpg
         import aiohttp
         import ssl
         from aiohttp import TCPConnector
-        
         try:
-            # Use EXISTING connection setup (but point to Docker database)
-            db_host = os.getenv("POSTGRES_HOST", "postgres")  # Docker service name
+            db_host = os.getenv("POSTGRES_HOST", "postgres")
             async with asyncpg.create_pool(
                 host=db_host, database=database, user=db_user, password=db_password
             ) as pool:
@@ -130,37 +113,29 @@ class BookProcessorWrapper:
                     connector=TCPConnector(ssl=ssl_context),
                     headers=headers
                 ) as session:
-                    
-                    # Use EXISTING semaphore pattern  
                     semaphore = asyncio.Semaphore(5)
-                    
-                    # Create tasks using our monitoring wrapper
                     tasks = [
                         asyncio.create_task(
                             self.semaphore_guard_with_monitoring(
-                                semaphore, url, chunk_size, pool, session, embedding_provider
+                                semaphore, url, chunk_size, pool, session, embedding_provider, chunking_strategy
                             )
                         )
                         for url in book_urls
                     ]
-                    
                     await asyncio.gather(*tasks, return_exceptions=True)
-                    
                     self.update_status("afsluttet")
                     self.save_failed_books()
-                    
                     logging.info(f"Behandling afsluttet: {self.processed_count} vellykket, {self.failed_count} fejlet")
-                    
         except Exception as e:
             logging.exception(f"Fatal fejl i behandlingen: {e}")
             self.update_status("fejl")
             raise
     
-    async def semaphore_guard_with_monitoring(self, semaphore, url, chunk_size, pool, session, embedding_provider):
-        """Use existing semaphore pattern with monitoring"""
+    async def semaphore_guard_with_monitoring(self, semaphore, url, chunk_size, pool, session, embedding_provider, chunking_strategy):
+        """Use existing semaphore pattern with monitoring and injectable chunking strategy"""
         async with semaphore:
             await self.process_single_book_with_monitoring(
-                url, chunk_size, pool, session, embedding_provider
+                url, chunk_size, pool, session, embedding_provider, chunking_strategy
             )
     
     async def retry_failed_books(self):

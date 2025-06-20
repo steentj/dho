@@ -94,6 +94,9 @@ A semantic search system for PDF files from slaegtsbibliotek.dk that uses embedd
 
 ## Development Process
 
+### Code rules
+- **Class**: One class per file
+
 ### Version Control
 - **Repository**: Code versioned in GitHub
 - **Branching**: Feature branches for development, merge to main

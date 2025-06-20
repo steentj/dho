@@ -6,10 +6,10 @@ import fitz  # PyMuPDF
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import os
-import re
 import logging
 from abc import ABC, abstractmethod
 from create_embeddings.logging_config import setup_logging
+from create_embeddings.chunking import ChunkingStrategy, ChunkingStrategyFactory
 
 # Import our new dependency injection system
 import sys
@@ -88,74 +88,6 @@ def extract_text_by_page(pdf) -> dict:
     return pages_text
 
 
-def chunk_text(text, max_tokens, title=None):
-    """Opdel teksten i chunks på maksimalt `max_tokens` ord."""
-    # Fjern ekstra mellemrum og linjeskift
-    text = re.sub(r"\s+", " ", text.strip())
-
-    if not text:
-        return []
-    
-    sentences = re.split(
-        r"(?<=[.!?]) +", text
-    )  # Split tekst ved slutningen af sætninger
-    current_chunk = []
-    current_length = 0
-
-    for sentence in sentences:
-        token_count = len(sentence.split())
-        
-        # If sentence is larger than max_tokens + 20%, split it
-        if token_count > max_tokens * 1.2:
-            # Yield current chunk if it has content
-            if current_chunk:
-                yield " ".join(current_chunk)
-                current_chunk = []
-                current_length = 0
-            
-            # Split the large sentence into smaller chunks
-            words = sentence.split()
-            for i in range(0, len(words), max_tokens):
-                chunk_words = words[i:i + max_tokens]
-                yield " ".join(add_title_to_chunk(chunk_words, title))
-
-        # If adding this sentence would exceed max_tokens, yield current chunk first
-        elif current_length + token_count > max_tokens:
-            if current_chunk:
-                yield " ".join(add_title_to_chunk(current_chunk, title))
-            current_chunk = [sentence]
-            current_length = token_count
-        
-        # Otherwise, add sentence to current chunk
-        else:
-            current_chunk.append(sentence)
-            current_length += token_count
-
-    # Yield any remaining content
-    if current_chunk:
-        yield " ".join(add_title_to_chunk(current_chunk, title))
-
-def add_title_to_chunk(chunk, title) -> str:
-    """Tilføj bogtitel til chunk, hvis den ikke allerede er der."""
-    if title:
-        return f"##{title}##{chunk}"
-    return chunk
-# async def get_embedding(chunk, openai_client, model=MODEL):
-#     """Generer embedding for en tekst-chunk."""
-#     response = await openai_client.embeddings.create(input=chunk, model=model)
-#     return response.data[0].embedding
-    # return list(i / 10000 for i in range(1536))
-
-# Legacy database function - replaced by dependency injection
-# async def safe_db_execute(url, conn, query, *params):
-#     """Wrapper til at udføre databaseforespørgsler med fejlbehandling."""
-#     try:
-#         return await conn.fetchval(query, *params)
-#     except Exception as e:
-#         logging.exception(f"Databasefejl ved query '{query}' for {url}: {e}")
-#         return None
-
-
 async def save_book(book, book_service: BookService):
     """Gem bogens metadata, tekst og embeddings i databasen using dependency injection."""
     try:
@@ -186,7 +118,7 @@ async def save_book(book, book_service: BookService):
         )
         raise
 
-async def parse_book(pdf, book_url, chunk_size, embedding_provider):
+async def parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy: ChunkingStrategy):
     """Udtræk tekst fra PDF, opdel i chunks, generer embeddings."""
     try:
         metadata = pdf.metadata or {}  # Håndter manglende metadata
@@ -202,7 +134,7 @@ async def parse_book(pdf, book_url, chunk_size, embedding_provider):
         pdf_pages = extract_text_by_page(pdf)
 
         for page_num, page_text in pdf_pages.items():
-            for chunk in chunk_text(page_text, chunk_size, book["titel"]):
+            for chunk in chunking_strategy.chunk_text(page_text, chunk_size, book["titel"]):
                 if chunk.strip():  # Ignorer tomme chunks
                     book["chunks"].append((page_num, chunk))
                     embedding = await embedding_provider.get_embedding(chunk)
@@ -213,7 +145,7 @@ async def parse_book(pdf, book_url, chunk_size, embedding_provider):
     return book
 
 
-async def process_book(book_url, chunk_size, book_service: BookService, session, embedding_provider):
+async def process_book(book_url, chunk_size, book_service: BookService, session, embedding_provider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection."""
     try:
         # Check om bogen allerede findes i databasen FØRST
@@ -226,7 +158,7 @@ async def process_book(book_url, chunk_size, book_service: BookService, session,
         pdf = await fetch_pdf(book_url, session)
         
         if pdf:
-            book = await parse_book(pdf, book_url, chunk_size, embedding_provider)
+            book = await parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy)
             await save_book(book, book_service)
             logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
         else:
@@ -246,6 +178,7 @@ async def main():
     provider = os.getenv("PROVIDER", "openai")
     chunk_size = int(os.getenv("CHUNK_SIZE", "1000"))
     url_file = os.getenv("URL_FILE", "test_input.txt")
+    chunking_strategy_name = os.getenv("CHUNKING_STRATEGY", "sentence_splitter")
 
     if not database_url:
         logging.error("DATABASE_URL environment variable is required")
@@ -253,6 +186,9 @@ async def main():
 
     # Initialize embedding provider
     embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
+
+    # Initialize chunking strategy
+    chunking_strategy = ChunkingStrategyFactory.create_strategy(chunking_strategy_name)
 
     # Configure logging using shared configuration
     setup_logging(log_dir=os.getenv("LOG_DIR"))
@@ -280,7 +216,7 @@ async def main():
             tasks = [
                 asyncio.create_task(
                     semaphore_guard(
-                        process_book, semaphore, url, chunk_size, book_service, session, embedding_provider
+                        process_book, semaphore, url, chunk_size, book_service, session, embedding_provider, chunking_strategy
                     )
                 )
                 for url in book_urls

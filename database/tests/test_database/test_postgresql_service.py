@@ -8,6 +8,20 @@ from database.postgresql_service import PostgreSQLService, BookService, create_p
 
 @pytest.mark.unit
 class TestPostgreSQLService:
+    @pytest.mark.asyncio
+    @patch.dict('os.environ', {'TESTING': 'true'})
+    async def test_find_book_by_url_exception_propagation(self):
+        """Test that exceptions in find_book_by_url are propagated."""
+        service = PostgreSQLService()
+        mock_book_repo = AsyncMock()
+        service._connection = Mock()  # Just to pass _ensure_connected
+        service._book_repository = mock_book_repo
+        service._search_repository = Mock()
+
+        mock_book_repo.find_book_by_url.side_effect = Exception("DB error")
+
+        with pytest.raises(Exception, match="DB error"):
+            await service.find_book_by_url("test.pdf")
     """Test PostgreSQL service implementation."""
     
     @patch.dict('os.environ', {'TESTING': 'true'})

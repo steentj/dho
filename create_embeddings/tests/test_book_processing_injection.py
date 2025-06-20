@@ -107,9 +107,10 @@ class TestBookProcessingWithInjection:
         # Mock session and embedding provider
         mock_session = AsyncMock()
         mock_embedding_provider = AsyncMock()
+        mock_chunking_strategy = Mock()
 
         # Call the function
-        await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider)
+        await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
 
         # Verify it checked for existing book
         mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
@@ -129,10 +130,11 @@ class TestBookProcessingWithInjection:
         # Mock session and embedding provider
         mock_session = AsyncMock()
         mock_embedding_provider = AsyncMock()
+        mock_chunking_strategy = Mock()
 
         # Mock fetch_pdf to return None (PDF not accessible)
         with patch('create_embeddings.opret_bøger.fetch_pdf', return_value=None) as mock_fetch:
-            await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider)
+            await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
 
             # Verify it checked for existing book
             mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
@@ -152,6 +154,7 @@ class TestBookProcessingWithInjection:
         # Mock session and embedding provider
         mock_session = AsyncMock()
         mock_embedding_provider = AsyncMock()
+        mock_chunking_strategy = Mock()
 
         # Mock PDF document
         mock_pdf = Mock()
@@ -170,11 +173,11 @@ class TestBookProcessingWithInjection:
         with patch('create_embeddings.opret_bøger.fetch_pdf', return_value=mock_pdf) as mock_fetch:
             with patch('create_embeddings.opret_bøger.parse_book', return_value=mock_book_data) as mock_parse:
                 with patch('create_embeddings.opret_bøger.save_book') as mock_save:
-                    await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider)
+                    await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
 
                     # Verify all steps were called
                     mock_fetch.assert_called_once_with(book_url, mock_session)
-                    mock_parse.assert_called_once_with(mock_pdf, book_url, 1000, mock_embedding_provider)
+                    mock_parse.assert_called_once_with(mock_pdf, book_url, 1000, mock_embedding_provider, mock_chunking_strategy)
                     mock_save.assert_called_once_with(mock_book_data, mock_book_service)
 
 
@@ -248,6 +251,54 @@ class TestEmbeddingProviders:
 @pytest.mark.integration
 @pytest.mark.skipif(not BOOK_PROCESSING_AVAILABLE, reason="Book processing modules not available")
 class TestBookProcessingIntegration:
+    @pytest.mark.integration
+    def test_wrapper_injects_alternate_chunking_strategy(self, monkeypatch):
+        """Test that BookProcessorWrapper injects an alternate chunking strategy (e.g., word_splitter) into process_book."""
+        from create_embeddings.book_processor_wrapper import BookProcessorWrapper
+        import tempfile
+        import os
+        import asyncio
+
+        # Create a temporary input file with one URL
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = os.path.join(tmpdir, "input")
+            os.makedirs(input_dir)
+            input_file = os.path.join(input_dir, "test_urls.txt")
+            with open(input_file, "w") as f:
+                f.write("https://example.com/book2.pdf\n")
+
+            # Patch environment to use the temp input dir and alternate strategy
+            monkeypatch.setenv("CHUNKING_STRATEGY", "word_splitter")
+            monkeypatch.setenv("POSTGRES_DB", "dummy")
+            monkeypatch.setenv("POSTGRES_USER", "dummy")
+            monkeypatch.setenv("POSTGRES_PASSWORD", "dummy")
+            monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+            monkeypatch.setenv("PROVIDER", "dummy")
+            monkeypatch.setenv("CHUNK_SIZE", "5")
+            monkeypatch.setenv("POSTGRES_HOST", "dummy")
+            # Patch the input path logic
+            monkeypatch.setattr("pathlib.Path.__truediv__", lambda self, other: Path(str(self) + "/" + str(other)))
+            monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+            monkeypatch.setattr("create_embeddings.book_processor_wrapper.Path", Path)
+            monkeypatch.setattr("create_embeddings.book_processor_wrapper.indlæs_urls", lambda path: ["https://example.com/book2.pdf"])
+
+            # Patch ChunkingStrategyFactory to return a mock for the alternate strategy
+            mock_strategy = Mock()
+            with patch("create_embeddings.book_processor_wrapper.ChunkingStrategyFactory.create_strategy", return_value=mock_strategy) as mock_factory:
+                # Patch process_book to check the strategy
+                with patch("create_embeddings.book_processor_wrapper.process_book", new_callable=AsyncMock) as mock_process_book:
+                    # Patch asyncpg.create_pool to avoid real DB connection
+                    with patch("database.postgresql.asyncpg.create_pool") as mock_create_pool:
+                        class DummyPool:
+                            async def __aenter__(self): return self
+                            async def __aexit__(self, exc_type, exc, tb): return False
+                        mock_create_pool.return_value = DummyPool()
+                        wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+                        asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
+                        # Assert the factory was called with the alternate strategy
+                        mock_factory.assert_called_with("word_splitter")
+                        # Assert process_book was called with the mock strategy
+                        assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
     """Integration tests for book processing with dependency injection."""
 
     @pytest.mark.asyncio
@@ -303,48 +354,96 @@ class TestBookProcessingIntegration:
         # Mock all external dependencies
         with patch('create_embeddings.opret_bøger.fetch_pdf') as mock_fetch_pdf:
             with patch('create_embeddings.opret_bøger.extract_text_by_page') as mock_extract:
-                with patch('create_embeddings.opret_bøger.chunk_text') as mock_chunk:
-                    
-                    # Setup mocks
-                    mock_pdf = Mock()
-                    mock_pdf.metadata = {"title": "Workflow Test", "author": "Test Author"}
-                    mock_pdf.close = Mock()
-                    # Add __len__ method to mock_pdf - needed by parse_book
-                    mock_pdf.__len__ = Mock(return_value=2)  # PDF has 2 pages
-                    mock_fetch_pdf.return_value = mock_pdf
-                    
-                    mock_extract.return_value = {1: "Page 1 text", 2: "Page 2 text"}
-                    mock_chunk.side_effect = [["chunk 1"], ["chunk 2"]]
-                    
-                    # Mock services - create a mock BookService with the methods expected by process_book
-                    book_service = AsyncMock()
-                    book_service.get_book_by_pdf_navn.return_value = None  # Book doesn't exist
-                    book_service.create_book.return_value = 456  # book_id
-                    book_service.create_chunk.return_value = None
-                    
-                    # Mock embedding provider
-                    mock_embedding_provider = AsyncMock()
-                    mock_embedding_provider.get_embedding.side_effect = [
-                        [0.1, 0.2, 0.3],  # First chunk embedding
-                        [0.4, 0.5, 0.6]   # Second chunk embedding
-                    ]
-                    
-                    # Mock session
-                    mock_session = AsyncMock()
-                    
-                    # Test the workflow
-                    book_url = "https://example.com/workflow-test.pdf"
-                    
-                    # First call should find no existing book - handled by return_value=None above
-                    
-                    await process_book(book_url, 1000, book_service, mock_session, mock_embedding_provider)
-                    
-                    # Verify the workflow
-                    mock_fetch_pdf.assert_called_once_with(book_url, mock_session)
-                    mock_extract.assert_called_once_with(mock_pdf)
-                    assert mock_chunk.call_count == 2  # Once for each page
-                    assert mock_embedding_provider.get_embedding.call_count == 2  # Once for each chunk
-                    mock_pdf.close.assert_called_once()
+                # Setup mocks
+                mock_strategy_instance = Mock()
+                mock_strategy_instance.chunk_text.side_effect = [["chunk 1"], ["chunk 2"]]
+                mock_pdf = Mock()
+                mock_pdf.metadata = {"title": "Workflow Test", "author": "Test Author"}
+                mock_pdf.close = Mock()
+                # Add __len__ method to mock_pdf - needed by parse_book
+                mock_pdf.__len__ = Mock(return_value=2)  # PDF has 2 pages
+                mock_fetch_pdf.return_value = mock_pdf
+                
+                mock_extract.return_value = {1: "Page 1 text", 2: "Page 2 text"}
+                
+                # Mock services - create a mock BookService with the methods expected by process_book
+                book_service = AsyncMock()
+                book_service.get_book_by_pdf_navn.return_value = None  # Book doesn't exist
+                book_service.create_book.return_value = 456  # book_id
+                book_service.create_chunk.return_value = None
+                
+                # Mock embedding provider
+                mock_embedding_provider = AsyncMock()
+                mock_embedding_provider.get_embedding.side_effect = [
+                    [0.1, 0.2, 0.3],  # First chunk embedding
+                    [0.4, 0.5, 0.6]   # Second chunk embedding
+                ]
+                
+                # Mock session
+                mock_session = AsyncMock()
+                
+                # Test the workflow
+                book_url = "https://example.com/workflow-test.pdf"
+                
+                # First call should find no existing book - handled by return_value=None above
+                
+                await process_book(book_url, 1000, book_service, mock_session, mock_embedding_provider, mock_strategy_instance)
+                
+                # Verify the workflow
+                mock_fetch_pdf.assert_called_once_with(book_url, mock_session)
+                mock_extract.assert_called_once_with(mock_pdf)
+                assert mock_strategy_instance.chunk_text.call_count == 2  # Once for each page
+                assert mock_embedding_provider.get_embedding.call_count == 2  # Once for each chunk
+                mock_pdf.close.assert_called_once()
+
+    @pytest.mark.integration
+    def test_wrapper_injects_chunking_strategy(self, monkeypatch):
+        """Test that BookProcessorWrapper injects the correct chunking strategy into process_book."""
+        from create_embeddings.book_processor_wrapper import BookProcessorWrapper
+        import tempfile
+        import os
+        import asyncio
+
+        # Create a temporary input file with one URL
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = os.path.join(tmpdir, "input")
+            os.makedirs(input_dir)
+            input_file = os.path.join(input_dir, "test_urls.txt")
+            with open(input_file, "w") as f:
+                f.write("https://example.com/book.pdf\n")
+
+            # Patch environment to use the temp input dir
+            monkeypatch.setenv("CHUNKING_STRATEGY", "sentence_splitter")
+            monkeypatch.setenv("POSTGRES_DB", "dummy")
+            monkeypatch.setenv("POSTGRES_USER", "dummy")
+            monkeypatch.setenv("POSTGRES_PASSWORD", "dummy")
+            monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+            monkeypatch.setenv("PROVIDER", "dummy")
+            monkeypatch.setenv("CHUNK_SIZE", "5")
+            monkeypatch.setenv("POSTGRES_HOST", "dummy")
+            # Patch the input path logic
+            monkeypatch.setattr("pathlib.Path.__truediv__", lambda self, other: Path(str(self) + "/" + str(other)))
+            monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+            monkeypatch.setattr("create_embeddings.book_processor_wrapper.Path", Path)
+            monkeypatch.setattr("create_embeddings.book_processor_wrapper.indlæs_urls", lambda path: ["https://example.com/book.pdf"])
+
+            # Patch ChunkingStrategyFactory to return a mock
+            mock_strategy = Mock()
+            with patch("create_embeddings.book_processor_wrapper.ChunkingStrategyFactory.create_strategy", return_value=mock_strategy) as mock_factory:
+                # Patch process_book to check the strategy
+                with patch("create_embeddings.book_processor_wrapper.process_book", new_callable=AsyncMock) as mock_process_book:
+                    # Patch asyncpg.create_pool to avoid real DB connection
+                    with patch("database.postgresql.asyncpg.create_pool") as mock_create_pool:
+                        class DummyPool:
+                            async def __aenter__(self): return self
+                            async def __aexit__(self, exc_type, exc, tb): return False
+                        mock_create_pool.return_value = DummyPool()
+                        wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+                        asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
+                        # Assert the factory was called with the env var
+                        mock_factory.assert_called_with("sentence_splitter")
+                        # Assert process_book was called with the mock strategy
+                        assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
 
 
 @pytest.mark.unit
@@ -383,11 +482,12 @@ class TestBookProcessingErrorHandling:
         # Mock session and embedding provider
         mock_session = AsyncMock()
         mock_embedding_provider = AsyncMock()
+        mock_chunking_strategy = Mock()
         
         # Mock fetch_pdf to raise a network error
         with patch('create_embeddings.opret_bøger.fetch_pdf', side_effect=Exception("Network error")):
             # Should not raise - should handle the error internally
-            await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider)
+            await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
             
             # Should have checked for existing book
             mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
