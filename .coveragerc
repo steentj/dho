@@ -1,0 +1,17 @@
+[run]
+source =
+    create_embeddings
+    searchapi
+omit =
+    */test_network.py
+    */tests/*
+    */test_*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
