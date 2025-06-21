@@ -8,13 +8,13 @@ from datetime import datetime
 import logging
 
 # Import ALL existing functionality from opret_bøger
-from opret_bøger import (
+from .opret_bøger import (
     indlæs_urls,
     process_book,
     EmbeddingProviderFactory,
     ChunkingStrategyFactory
 )
-from logging_config import setup_logging
+from .logging_config import setup_logging
 
 class BookProcessorWrapper:
     """Wrapper around existing opret_bøger.py functionality"""

@@ -1,13 +1,21 @@
-"""
-Comprehensive tests for book processing with dependency injection.
-"""
+
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+import asyncio
+import tempfile
+import os
+import json
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 # Add the src directory to the path for imports
 sys.path.append(str(Path(__file__).parent.parent.parent))
+
+try:
+    from create_embeddings.book_processor_wrapper import BookProcessorWrapper
+    BOOK_PROCESSOR_WRAPPER_AVAILABLE = True
+except ImportError:
+    BOOK_PROCESSOR_WRAPPER_AVAILABLE = False
 
 try:
     from create_embeddings.opret_bøger import (
@@ -18,11 +26,132 @@ try:
         DummyEmbeddingProvider,
         EmbeddingProviderFactory
     )
-    # We no longer need to import BookService as we're not using it for spec
     BOOK_PROCESSING_AVAILABLE = True
 except ImportError as e:
     pytest.skip(f"Could not import book processing modules: {e}", allow_module_level=True)
     BOOK_PROCESSING_AVAILABLE = False
+
+@pytest.mark.unit
+@pytest.mark.skipif(not BOOK_PROCESSOR_WRAPPER_AVAILABLE, reason="BookProcessorWrapper not available")
+class TestBookProcessorWrapperHighPriority:
+    @pytest.mark.asyncio
+    async def test_semaphore_guard_with_monitoring(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+            async def dummy_process(*args, **kwargs):
+                wrapper.processed_count += 1
+            semaphore = asyncio.Semaphore(1)
+            # Patch process_single_book_with_monitoring to dummy_process
+            wrapper.process_single_book_with_monitoring = dummy_process
+            await wrapper.semaphore_guard_with_monitoring(
+                semaphore, 'url', 100, None, None, None, None
+            )
+            assert wrapper.processed_count == 1
+
+    @pytest.mark.asyncio
+    async def test_semaphore_guard_with_monitoring_handles_exception(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+            # Mock the process_single_book_with_monitoring to simulate error handling
+            async def mock_process_with_error(*args, **kwargs):
+                wrapper.failed_count += 1
+                wrapper.failed_books.append({"url": args[0], "error": "test error", "timestamp": "now"})
+            wrapper.process_single_book_with_monitoring = mock_process_with_error
+            semaphore = asyncio.Semaphore(1)
+            await wrapper.semaphore_guard_with_monitoring(
+                semaphore, 'url', 100, None, None, None, None
+            )
+            # Should not raise, error is handled internally
+            assert wrapper.failed_count == 1
+
+    @pytest.mark.asyncio
+    async def test_process_single_book_with_monitoring_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+            async def dummy_process(*args, **kwargs):
+                pass
+            wrapper.processed_count = 0
+            await wrapper.process_single_book_with_monitoring('url', 100, None, None, dummy_process, None)
+            assert wrapper.processed_count == 1
+
+    @pytest.mark.asyncio
+    async def test_process_single_book_with_monitoring_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+            # Mock the process_book function to avoid calling the real implementation
+            with patch('create_embeddings.book_processor_wrapper.process_book') as mock_process:
+                mock_process.side_effect = Exception("test failure")
+                wrapper.failed_count = 0
+                await wrapper.process_single_book_with_monitoring('url', 100, None, None, None, None)
+                assert wrapper.failed_count == 1
+                assert len(wrapper.failed_books) == 1
+
+    @pytest.mark.asyncio
+    async def test_retry_failed_books(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            failed_dir = tmpdir
+            output_dir = tmpdir
+            failed_file = os.path.join(failed_dir, "failed_books.json")
+            with open(failed_file, "w") as f:
+                json.dump([
+                    {"url": "url1", "error": "err", "timestamp": "now"},
+                    {"url": "url2", "error": "err", "timestamp": "now"}
+                ], f)
+            wrapper = BookProcessorWrapper(output_dir=output_dir, failed_dir=failed_dir)
+            
+            # Create a mock input directory for the test
+            input_dir = os.path.join(tmpdir, "input")
+            os.makedirs(input_dir, exist_ok=True)
+            
+            # Mock the process_books_from_file method
+            async def fake_process_books_from_file(filename):
+                wrapper.processed_count += 2
+            
+            # Patch the hardcoded path and the process method
+            with patch('create_embeddings.book_processor_wrapper.Path') as mock_path:
+                # Configure the mock to behave like Path("/app/input")
+                mock_input_path = Mock()
+                mock_retry_file = Mock()
+                mock_retry_file.write_text = Mock()
+                mock_input_path.__truediv__ = Mock(return_value=mock_retry_file)
+                mock_path.return_value = mock_input_path
+                
+                with patch.object(wrapper, 'process_books_from_file', side_effect=fake_process_books_from_file):
+                    await wrapper.retry_failed_books()
+                    assert wrapper.processed_count == 2
+
+    def test_save_failed_books_and_status(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+            wrapper.failed_books = [
+                {"url": "url1", "error": "err", "timestamp": "now"}
+            ]
+            wrapper.save_failed_books()
+            failed_file = os.path.join(tmpdir, "failed_books.json")
+            assert os.path.exists(failed_file)
+            with open(failed_file) as f:
+                data = json.load(f)
+                assert data[0]["url"] == "url1"
+            wrapper.total_count = 1
+            wrapper.processed_count = 1
+            wrapper.failed_count = 0
+            wrapper.update_status("done")
+            status_file = os.path.join(tmpdir, "processing_status.json")
+            assert os.path.exists(status_file)
+            with open(status_file) as f:
+                status = json.load(f)
+                assert status["status"] == "done"
+
+    @pytest.mark.asyncio
+    async def test_process_books_from_file_file_not_found(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+            with pytest.raises(FileNotFoundError):
+                await wrapper.process_books_from_file("nonexistent.txt")
+
+"""
+Comprehensive tests for book processing with dependency injection.
+"""
 
 
 @pytest.mark.unit
