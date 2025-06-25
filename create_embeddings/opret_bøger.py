@@ -3,11 +3,9 @@ import aiohttp
 import ssl
 from aiohttp import TCPConnector
 import fitz  # PyMuPDF
-from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import os
 import logging
-from abc import ABC, abstractmethod
 from create_embeddings.logging_config import setup_logging
 from create_embeddings.chunking import ChunkingStrategy, ChunkingStrategyFactory
 
@@ -17,37 +15,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from database import BookService, PostgreSQLService
 
-# Define the EmbeddingProvider interface
-class EmbeddingProvider(ABC):
-    @abstractmethod
-    async def get_embedding(self, chunk: str) -> list:
-        pass
-
-# Implement the OpenAIEmbeddingProvider
-class OpenAIEmbeddingProvider(EmbeddingProvider):
-    def __init__(self, api_key: str):
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.model = os.getenv("OPENAI_MODEL")
-
-    async def get_embedding(self, chunk: str) -> list:
-        response = await self.client.embeddings.create(input=chunk, model=self.model)
-        return response.data[0].embedding
-
-# Implement a dummy embedding provider for testing
-class DummyEmbeddingProvider(EmbeddingProvider):
-    async def get_embedding(self, chunk: str) -> list:
-        return list(i / 10000 for i in range(1536))
-
-# Create a factory for embedding providers
-class EmbeddingProviderFactory:
-    @staticmethod
-    def create_provider(provider_name: str, api_key: str) -> EmbeddingProvider:
-        if provider_name == "openai":
-            return OpenAIEmbeddingProvider(api_key)
-        elif provider_name == "dummy":
-            return DummyEmbeddingProvider()
-        else:
-            raise ValueError(f"Ukendt udbyder: {provider_name}")
+# Import embedding providers from the new providers package
+from .providers import (
+    EmbeddingProvider,
+    EmbeddingProviderFactory
+)
+# Import classes for backward compatibility - these are re-exported
+from .providers import OpenAIEmbeddingProvider, DummyEmbeddingProvider
 
 def indlæs_urls(file_path):
     """Læs URL'er fra filen."""
@@ -118,7 +92,7 @@ async def save_book(book, book_service: BookService):
         )
         raise
 
-async def parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy: ChunkingStrategy):
+async def parse_book(pdf, book_url, chunk_size, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Udtræk tekst fra PDF, opdel i chunks, generer embeddings."""
     try:
         metadata = pdf.metadata or {}  # Håndter manglende metadata
@@ -215,7 +189,7 @@ def _find_starting_page(word_position: int, page_markers: list[tuple[int, int]])
     return starting_page
 
 
-async def process_book(book_url, chunk_size, book_service: BookService, session, embedding_provider, chunking_strategy: ChunkingStrategy):
+async def process_book(book_url, chunk_size, book_service: BookService, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection."""
     try:
         # Check om bogen allerede findes i databasen FØRST
@@ -306,6 +280,22 @@ async def semaphore_guard(coro, semaphore, *args):
     async with semaphore:
         await coro(*args)
 
+
+# Backward compatibility exports - these need to be available for existing code
+__all__ = [
+    'EmbeddingProvider',
+    'OpenAIEmbeddingProvider', 
+    'DummyEmbeddingProvider',
+    'EmbeddingProviderFactory',
+    'indlæs_urls',
+    'fetch_pdf',
+    'extract_text_by_page',
+    'save_book',
+    'parse_book',
+    'process_book',
+    'main',
+    'semaphore_guard'
+]
 
 if __name__ == "__main__":
     asyncio.run(main())

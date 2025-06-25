@@ -1,17 +1,24 @@
+import os
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import List
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from contextlib import asynccontextmanager
-from typing import List
-import os
 from dotenv import load_dotenv
-from openai import OpenAI
 
-# Import our new dependency injection system
-from database import PostgreSQLService
+# Add the src directory to Python path for imports - must be done before other imports
+src_path = Path(__file__).parent.parent.parent
+sys.path.append(str(src_path))
 
-# Load environment variables first
+# Load environment variables
 load_dotenv()
+
+# Import our dependencies after path setup
+from database import PostgreSQLService  # noqa: E402
+from create_embeddings.providers import EmbeddingProviderFactory  # noqa: E402
 
 
 class SearchResult(BaseModel):
@@ -32,13 +39,14 @@ class SearchResponse(BaseModel):
     
 # Alternative: use List[SearchResult] directly as response model
 
-# Global service instance  
+# Global service instances  
 db_service = None
+embedding_provider = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager using dependency injection."""
-    global db_service
+    global db_service, embedding_provider
     
     # Initialize PostgreSQL service with dependency injection
     database_url = os.getenv("DATABASE_URL", None)
@@ -46,12 +54,25 @@ async def lifespan(app: FastAPI):
     await db_service.connect()
     print("Opstart: Database service connected using dependency injection")
     
+    # Initialize embedding provider with dependency injection
+    provider_name = os.getenv("PROVIDER", "openai")
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL", "text-embedding-3-small")
+    
+    embedding_provider = EmbeddingProviderFactory.create_provider(
+        provider_name=provider_name, 
+        api_key=api_key, 
+        model=model
+    )
+    print(f"Opstart: Embedding provider '{provider_name}' initialized with model '{model}'")
+    
     yield
     
     # Cleanup
     await db_service.disconnect()
     print("Luk ned: Database service disconnected")
     db_service = None
+    embedding_provider = None
 
 app = FastAPI(lifespan=lifespan)
 
@@ -85,11 +106,9 @@ async def rod_side():
 @app.post("/search", response_model=List[SearchResult])
 async def search(request: Input) -> List[SearchResult]:
     print(f'Søger efter "{request.query}"...')
-    openai_key = os.getenv("OPENAI_API_KEY", None)
-    client = OpenAI()
-    client.api_key = openai_key
-
-    vektor = get_embedding(request.query, client)
+    
+    # Use the injected embedding provider instead of direct OpenAI client
+    vektor = await embedding_provider.get_embedding(request.query)
 
     resultater = await find_nærmeste(vektor)
 
@@ -238,13 +257,6 @@ async def find_nærmeste(vektor: list) -> list:
     except Exception as e:
         print(f"Fejl ved indlæsning af databasen: {e}")
         return []
-
-def get_embedding(text, client, model="text-embedding-3-small"):
-    text = text.replace("\n", " ")
-    embeddings = (
-        client.embeddings.create(input=[text], model=model).data[0].embedding
-    )
-    return embeddings
 
 def extract_text_from_chunk(raw_chunk: str):
     """

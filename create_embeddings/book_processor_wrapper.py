@@ -11,9 +11,9 @@ import logging
 from .opret_bøger import (
     indlæs_urls,
     process_book,
-    EmbeddingProviderFactory,
-    ChunkingStrategyFactory
 )
+from .providers import EmbeddingProviderFactory
+from .chunking import ChunkingStrategyFactory
 from .logging_config import setup_logging
 
 class BookProcessorWrapper:

@@ -7,7 +7,7 @@ behavior of the search API.
 """
 import pytest
 import os
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 import sys
 from pathlib import Path
@@ -16,36 +16,48 @@ from pathlib import Path
 searchapi_path = Path(__file__).parent.parent.parent / "searchapi"
 sys.path.insert(0, str(searchapi_path))
 
+# Add the create_embeddings directory to the path for provider imports
+create_embeddings_path = Path(__file__).parent.parent.parent.parent / "create_embeddings"
+sys.path.insert(0, str(create_embeddings_path))
+
 try:
     from searchapi.dhosearch import app
+    from providers.embedding_providers import DummyEmbeddingProvider
     FASTAPI_AVAILABLE = True
 except ImportError as e:
     pytest.skip(f"Could not import FastAPI app: {e}", allow_module_level=True)
     FASTAPI_AVAILABLE = False
 
     
-    def test_search_api_returns_empty_when_no_results_under_threshold(self):
-        """Test that API returns empty results when no matches are under threshold.
-        """
-        # All results above threshold
-        mock_results = [
-            ("book1.pdf", "Book One", "Author One", 1, "chunk 1", 0.8),
-            ("book2.pdf", "Book Two", "Author Two", 2, "chunk 2", 0.9),
-        ]
-        
-        with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
-            with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
-                    mock_find.return_value = mock_results
-                    mock_embedding.return_value = [0.1, 0.2, 0.3]
-                    
-                    client = TestClient(app)
-                    response = client.post("/search", json={"query": "test query"})
-                    
-                    assert response.status_code == 200
-                    results = response.json()
-                    
-                    assert len(results) == 0, f"Expected 0 results when all distances > threshold, got {len(results)}"
+def test_search_api_returns_empty_when_no_results_under_threshold(self):
+    """Test that API returns empty results when no matches are under threshold.
+    """
+    # All results above threshold
+    mock_results = [
+        ("book1.pdf", "Book One", "Author One", 1, "chunk 1", 0.8),
+        ("book2.pdf", "Book Two", "Author Two", 2, "chunk 2", 0.9),
+    ]
+    
+    with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
+        with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
+            # Set up embedding provider for test
+            import searchapi.dhosearch as dhosearch_module
+            original_provider = dhosearch_module.embedding_provider
+            dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+            
+            try:
+                mock_find.return_value = mock_results
+                
+                client = TestClient(app)
+                response = client.post("/search", json={"query": "test query"})
+                
+                assert response.status_code == 200
+                results = response.json()
+                
+                assert len(results) == 0, f"Expected 0 results when all distances > threshold, got {len(results)}"
+            finally:
+                # Restore original provider
+                dhosearch_module.embedding_provider = original_provider
 
 
 @pytest.mark.integration
@@ -69,7 +81,12 @@ class TestSearchAPIIntegrationResultGrouping:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -105,7 +122,12 @@ class TestSearchAPIIntegrationResultGrouping:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -143,7 +165,12 @@ class TestSearchAPIIntegrationURLFormatting:
 
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     with patch('searchapi.dhosearch.lifespan') as mock_lifespan:
                         mock_lifespan.return_value.__aenter__.return_value = None
                         mock_lifespan.return_value.__aexit__.return_value = None
@@ -183,7 +210,12 @@ class TestSearchAPIIntegrationURLFormatting:
 
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     with patch('searchapi.dhosearch.lifespan') as mock_lifespan:
                         mock_lifespan.return_value.__aenter__.return_value = None
                         mock_lifespan.return_value.__aexit__.return_value = None
@@ -223,7 +255,12 @@ class TestSearchAPIIntegrationChunkConcatenation:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -259,7 +296,12 @@ class TestSearchAPIIntegrationChunkConcatenation:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -293,7 +335,12 @@ class TestSearchAPIIntegrationResponseStructure:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -333,7 +380,12 @@ class TestSearchAPIIntegrationResponseStructure:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
@@ -372,7 +424,12 @@ class TestSearchAPIIntegrationEndToEnd:
         
         with patch.dict(os.environ, {"DISTANCE_THRESHOLD": "0.5"}):
             with patch('searchapi.dhosearch.find_nærmeste') as mock_find:
-                with patch('searchapi.dhosearch.get_embedding') as mock_embedding:
+                # Set up embedding provider for test
+                import searchapi.dhosearch as dhosearch_module
+                original_provider = dhosearch_module.embedding_provider
+                dhosearch_module.embedding_provider = DummyEmbeddingProvider()
+                
+                try:
                     mock_find.return_value = mock_results
                     mock_embedding.return_value = [0.1, 0.2, 0.3]
                     
