@@ -1,4 +1,7 @@
 # Installationsvejledning
+
+_Skal opdateres - 26-06-2025_
+
 For at installere denne soegemaskine skal der laves en del fodarbejde.
 1. Postgresql installeres og køres i Docker. Så Docker skal installeres. Dette kræver så tilsyneladende også WSL (Windows Subsystem for Linux) kører.
 1. Der skal installeres pgAdmin, som er det grafiske Postgres administrationsværktøj.<br>
