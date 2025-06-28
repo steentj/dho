@@ -110,6 +110,8 @@ class TestSearchAPIIntegrationResultGrouping:
                     assert "First chunk about events" in chunk_content, "Should contain first chunk"
                     assert "Second chunk about events" in chunk_content, "Should contain second chunk" 
                     assert "Third chunk about events" in chunk_content, "Should contain third chunk"
+                finally:
+                    dhosearch_module.embedding_provider = original_provider
     
     def test_search_api_includes_page_information_for_grouped_results(self):
         """Test that grouped results include page information.

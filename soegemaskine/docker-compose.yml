@@ -43,6 +43,28 @@ services:
     restart: always
     command: ["postgres", "-c", "shared_preload_libraries=vector"]
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dho-ollama
+    volumes:
+      - ${HOME}/dhoOllamaModels:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - dho-network
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - embeddings
+
   book-processor:
     build:
       context: ../create_embeddings
@@ -50,8 +72,12 @@ services:
     container_name: dho-book-processor
     env_file:
       - .env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=nomic-embed-text
     depends_on:
       - postgres
+      - ollama
     volumes:
       - ./book_input:/app/input:ro
       - ./book_output:/app/output
@@ -61,6 +87,7 @@ services:
     restart: "no"
     profiles:
       - book-processing
+      - embeddings
 
 networks:
   dho-network:

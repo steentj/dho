@@ -2,7 +2,8 @@
 Factory for creating embedding providers.
 """
 
-from .embedding_providers import EmbeddingProvider, OpenAIEmbeddingProvider, DummyEmbeddingProvider
+import os
+from .embedding_providers import EmbeddingProvider, OpenAIEmbeddingProvider, DummyEmbeddingProvider, OllamaEmbeddingProvider
 
 
 class EmbeddingProviderFactory:
@@ -14,8 +15,8 @@ class EmbeddingProviderFactory:
         Create an embedding provider instance.
         
         Args:
-            provider_name: Name of the provider ('openai' or 'dummy')
-            api_key: API key for the provider (required for openai)
+            provider_name: Name of the provider ('openai', 'ollama', or 'dummy')
+            api_key: API key for the provider (required for openai, ignored for ollama/dummy)
             model: Model to use (optional, uses default if not specified)
             
         Returns:
@@ -26,6 +27,10 @@ class EmbeddingProviderFactory:
         """
         if provider_name == "openai":
             return OpenAIEmbeddingProvider(api_key, model)
+        elif provider_name == "ollama":
+            base_url = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+            model = model or os.getenv("OLLAMA_MODEL", "nomic-embed-text")
+            return OllamaEmbeddingProvider(base_url, model)
         elif provider_name == "dummy":
             return DummyEmbeddingProvider()
         else:
