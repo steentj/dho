@@ -62,29 +62,29 @@ def extract_text_by_page(pdf) -> dict:
     return pages_text
 
 
-async def save_book(book, book_service: BookService):
+async def save_book(book, book_service: BookService, embedding_provider: EmbeddingProvider):
     """Gem bogens metadata, tekst og embeddings i databasen using dependency injection."""
     try:
-        # Create book metadata using the service
-        book_id = await book_service.create_book(
-            pdf_navn=book["pdf-url"],
-            titel=book["titel"],
-            forfatter=book["forfatter"],
-            antal_sider=book["sider"]
+        # Get the provider-specific table name
+        table_name = embedding_provider.get_table_name()
+        
+        # Get or create book metadata using the enhanced service method
+        # This will reuse existing metadata if the book exists, or create new if it doesn't
+        book_id = await book_service.get_or_create_book(
+            pdf_url=book["pdf-url"],
+            title=book["titel"],
+            author=book["forfatter"],
+            pages=book["sider"]
         )
 
-        # Save chunks using the service
-        for (page_num, chunk_text), embedding in zip(
-            book["chunks"], book["embeddings"]
-        ):
-            await book_service.create_chunk(
-                book_id=book_id,
-                sidenr=page_num,
-                chunk=chunk_text,
-                embedding=embedding
-            )
+        # Save chunks using the provider-specific table
+        chunks_with_embeddings = []
+        for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+            chunks_with_embeddings.append((page_num, chunk_text, embedding))
+        
+        await book_service._service.save_chunks(book_id, chunks_with_embeddings, table_name)
             
-        logging.info(f"Successfully saved book {book['titel']} with {len(book['chunks'])} chunks")
+        logging.info(f"Successfully saved book {book['titel']} with {len(book['chunks'])} chunks to {table_name} table")
         
     except Exception as e:
         logging.exception(
@@ -192,18 +192,23 @@ def _find_starting_page(word_position: int, page_markers: list[tuple[int, int]])
 async def process_book(book_url, chunk_size, book_service: BookService, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection."""
     try:
-        # Check om bogen allerede findes i databasen FØRST
-        existing_book = await book_service.get_book_by_pdf_navn(book_url)
-        if existing_book:
-            logging.info(f"Bogen {book_url} er allerede i databasen - springer over")
-            return
+        # Check om bogen allerede findes i databasen og om embeddings for denne provider findes
+        book_id = await book_service._service.find_book_by_url(book_url)
+        if book_id:
+            # Book exists, check if embeddings exist for this specific provider
+            has_embeddings = await embedding_provider.has_embeddings_for_book(book_id, book_service._service)
+            if has_embeddings:
+                logging.info(f"Bogen {book_url} er allerede behandlet med {embedding_provider.get_provider_name()} provider - springer over")
+                return
+            else:
+                logging.info(f"Bogen {book_url} findes, men ikke med {embedding_provider.get_provider_name()} provider - behandler med denne provider")
         
-        # Hvis bogen ikke findes, hent PDF og behandl den
+        # Hvis bogen ikke findes eller embeddings ikke findes for denne provider, hent PDF og behandl den
         pdf = await fetch_pdf(book_url, session)
         
         if pdf:
             book = await parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy)
-            await save_book(book, book_service)
+            await save_book(book, book_service, embedding_provider)
             logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
         else:
             logging.warning(f"Kunne ikke hente PDF fra {book_url}")

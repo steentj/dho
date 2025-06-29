@@ -7,7 +7,7 @@ import tempfile
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
+from unittest.mock import AsyncMock, Mock, patch
 import aiohttp
 
 # Add the src directory to the path for imports
@@ -70,7 +70,9 @@ class TestOpretBøgerMediumPriority:
     def test_indlæs_urls_file_not_found(self):
         """Test indlæs_urls with non-existent file."""
         with pytest.raises(FileNotFoundError):
-            indlæs_urls("nonexistent_file.txt")    @pytest.mark.asyncio
+            indlæs_urls("nonexistent_file.txt")
+    
+    @pytest.mark.asyncio
     async def test_fetch_pdf_success(self):
         """Test successful PDF fetching."""
         # Mock PDF content
@@ -385,9 +387,11 @@ class TestOpretBøgerIntegration:
         """Test the complete process_book workflow integration."""
         book_url = "https://example.com/integration-test.pdf"
         
-        # Mock book service
+        # Mock book service and PostgreSQL service
         mock_book_service = AsyncMock()
-        mock_book_service.get_book_by_pdf_navn.return_value = None  # Book doesn't exist
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
         
         # Mock session and PDF fetching
         mock_session = AsyncMock()
@@ -424,26 +428,32 @@ class TestOpretBøgerIntegration:
                     )
                     
                     # Verify the complete workflow was executed
-                    mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
+                    mock_postgresql_service.find_book_by_url.assert_called_once_with(book_url)
                     mock_fetch.assert_called_once_with(book_url, mock_session)
                     mock_parse.assert_called_once_with(
                         mock_pdf, book_url, 1000, mock_embedding_provider, mock_chunking_strategy
                     )
-                    mock_save.assert_called_once_with(mock_book_data, mock_book_service)
+                    mock_save.assert_called_once_with(mock_book_data, mock_book_service, mock_embedding_provider)
     
     @pytest.mark.asyncio
-    async def test_process_book_skips_existing_book_integration(self):
-        """Test that process_book properly skips existing books."""
+    async def test_process_book_skips_existing_book_with_embeddings_integration(self):
+        """Test that process_book properly skips existing books with embeddings for the provider."""
         book_url = "https://example.com/existing-book.pdf"
+        book_id = 123
         
-        # Mock book service that returns existing book
+        # Mock book service and PostgreSQL service
         mock_book_service = AsyncMock()
-        existing_book = {"id": 123, "title": "Existing Book"}
-        mock_book_service.get_book_by_pdf_navn.return_value = existing_book
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = book_id
+        
+        # Mock embedding provider that has embeddings for this book
+        mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.has_embeddings_for_book.return_value = True
+        mock_embedding_provider.get_provider_name = Mock(return_value="OpenAI")  # Use Mock for sync method
         
         # Mock other dependencies (should not be called)
         mock_session = AsyncMock()
-        mock_embedding_provider = AsyncMock()
         mock_chunking_strategy = Mock()
         
         with patch('create_embeddings.opret_bøger.fetch_pdf') as mock_fetch:
@@ -453,7 +463,10 @@ class TestOpretBøgerIntegration:
             )
             
             # Verify book existence was checked
-            mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
+            mock_postgresql_service.find_book_by_url.assert_called_once_with(book_url)
+            
+            # Verify provider-specific embeddings were checked
+            mock_embedding_provider.has_embeddings_for_book.assert_called_once_with(book_id, mock_postgresql_service)
             
             # Verify PDF fetching was skipped
             mock_fetch.assert_not_called()

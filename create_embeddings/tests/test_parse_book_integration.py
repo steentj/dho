@@ -1,8 +1,10 @@
 import unittest.mock as mock
+import pytest
 from create_embeddings.opret_bøger import parse_book
 from create_embeddings.chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy
 
 
+@pytest.mark.asyncio
 async def test_parse_book_integration_word_overlap():
     """Test that parse_book correctly uses cross-page chunking for WordOverlapChunkingStrategy"""
     
@@ -57,6 +59,7 @@ async def test_parse_book_integration_word_overlap():
         assert not chunk_text.startswith("##")
 
 
+@pytest.mark.asyncio
 async def test_parse_book_integration_sentence_splitter():
     """Test that parse_book correctly uses page-by-page chunking for SentenceSplitterChunkingStrategy"""
     

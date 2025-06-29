@@ -200,7 +200,7 @@ class TestPostgreSQLService:
         # Test save_chunks
         chunks = [(1, "chunk1", [0.1, 0.2]), (2, "chunk2", [0.3, 0.4])]
         await service.save_chunks(123, chunks)
-        mock_book_repo.save_chunks.assert_called_once_with(123, chunks)
+        mock_book_repo.save_chunks.assert_called_once_with(123, chunks, "chunks")
         
         # Test vector_search
         embedding = [0.1, 0.2, 0.3]
@@ -435,5 +435,5 @@ class TestPostgreSQLServiceIntegration:
         # Verify all operations were called
         mock_book_repo.find_book_by_url.assert_called_once_with("test.pdf")
         mock_book_repo.create_book.assert_called_once_with("test.pdf", "Test Book", "Test Author", 100)
-        mock_book_repo.save_chunks.assert_called_once_with(123, chunks)
+        mock_book_repo.save_chunks.assert_called_once_with(123, chunks, "chunks")
         mock_search_repo.vector_search.assert_called_once()

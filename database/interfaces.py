@@ -58,8 +58,14 @@ class BookRepository(ABC):
         pass
     
     @abstractmethod
-    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]]) -> None:
-        """Save chunks and their embeddings for a book."""
+    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]], table_name: str = "chunks") -> None:
+        """Save chunks and their embeddings for a book.
+        
+        Args:
+            book_id: The database ID of the book
+            chunks_with_embeddings: List of tuples containing (page_nr, chunk_text, embedding)
+            table_name: Name of the table to store chunks in (default: "chunks")
+        """
         pass
 
 

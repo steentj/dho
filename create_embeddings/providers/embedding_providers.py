@@ -25,6 +25,40 @@ class EmbeddingProvider(ABC):
             List of floats representing the embedding vector
         """
         pass
+    
+    @abstractmethod
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        """
+        Check if embeddings already exist for a book with this provider.
+        
+        Args:
+            book_id: The database ID of the book
+            db_service: Database service for checking embeddings
+            
+        Returns:
+            True if embeddings exist, False otherwise
+        """
+        pass
+    
+    @abstractmethod
+    def get_table_name(self) -> str:
+        """
+        Get the database table name used by this provider.
+        
+        Returns:
+            Table name for storing embeddings
+        """
+        pass
+    
+    @abstractmethod
+    def get_provider_name(self) -> str:
+        """
+        Get the name/identifier of this provider.
+        
+        Returns:
+            Provider name for logging and identification
+        """
+        pass
 
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
@@ -53,6 +87,35 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         """
         response = await self.client.embeddings.create(input=chunk, model=self.model)
         return response.data[0].embedding
+    
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        """
+        Check if OpenAI embeddings already exist for a book.
+        
+        Args:
+            book_id: The database ID of the book
+            db_service: Database service for checking embeddings
+            
+        Returns:
+            True if embeddings exist in chunks table, False otherwise
+        """
+        try:
+            # Check if chunks exist for this book in the OpenAI table
+            query = "SELECT COUNT(*) as count FROM chunks WHERE book_id = $1"
+            result = await db_service.execute_query(query, [book_id])
+            count = result[0]['count'] if result else 0
+            return count > 0
+        except Exception:
+            # If there's any error checking, assume no embeddings exist
+            return False
+    
+    def get_table_name(self) -> str:
+        """Get the database table name for OpenAI embeddings."""
+        return "chunks"
+    
+    def get_provider_name(self) -> str:
+        """Get the provider name for OpenAI."""
+        return "openai"
 
 
 class DummyEmbeddingProvider(EmbeddingProvider):
@@ -69,6 +132,35 @@ class DummyEmbeddingProvider(EmbeddingProvider):
         """
         # Generate deterministic dummy embeddings with 1536 dimensions
         return [float(i)/10000 for i in range(1536)]
+    
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        """
+        Check if dummy embeddings already exist for a book.
+        
+        Args:
+            book_id: The database ID of the book
+            db_service: Database service for checking embeddings
+            
+        Returns:
+            True if embeddings exist in chunks table, False otherwise
+        """
+        try:
+            # Check if chunks exist for this book in the chunks table
+            query = "SELECT COUNT(*) as count FROM chunks WHERE book_id = $1"
+            result = await db_service.execute_query(query, [book_id])
+            count = result[0]['count'] if result else 0
+            return count > 0
+        except Exception:
+            # If there's any error checking, assume no embeddings exist
+            return False
+    
+    def get_table_name(self) -> str:
+        """Get the database table name for dummy embeddings."""
+        return "chunks"  # Use same table as OpenAI for testing
+    
+    def get_provider_name(self) -> str:
+        """Get the provider name for dummy provider."""
+        return "dummy"
 
 
 class OllamaEmbeddingProvider(EmbeddingProvider):
@@ -116,6 +208,35 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
             raise RuntimeError(f"Ollama embedding request failed: JSON error: {e}")
         except Exception as e:
             raise RuntimeError(f"Ollama embedding request failed: {e}")
+    
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        """
+        Check if Ollama embeddings already exist for a book.
+        
+        Args:
+            book_id: The database ID of the book
+            db_service: Database service for checking embeddings
+            
+        Returns:
+            True if embeddings exist in chunks_nomic table, False otherwise
+        """
+        try:
+            # Check if chunks exist for this book in the Ollama table
+            query = "SELECT COUNT(*) as count FROM chunks_nomic WHERE book_id = $1"
+            result = await db_service.execute_query(query, [book_id])
+            count = result[0]['count'] if result else 0
+            return count > 0
+        except Exception:
+            # If there's any error checking (e.g., table doesn't exist), assume no embeddings
+            return False
+    
+    def get_table_name(self) -> str:
+        """Get the database table name for Ollama embeddings."""
+        return "chunks_nomic"
+    
+    def get_provider_name(self) -> str:
+        """Get the provider name for Ollama."""
+        return "ollama"
 
     async def __aenter__(self):
         """Async context manager entry."""

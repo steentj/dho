@@ -1,4 +1,3 @@
-
 import pytest
 import asyncio
 import tempfile
@@ -178,31 +177,33 @@ class TestBookProcessingWithInjection:
             ]
         }
 
-        # Mock BookService
+        # Mock BookService with PostgreSQL service
         mock_book_service = AsyncMock()  # Removed spec=BookService
-        mock_book_service.create_book.return_value = 123  # Mock book ID
-        mock_book_service.create_chunk.return_value = None
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_book_service.get_or_create_book.return_value = 123  # Mock get_or_create_book
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
+        mock_postgresql_service.create_book.return_value = 123  # Mock book ID
+        mock_postgresql_service.save_chunks.return_value = None
+
+        # Mock embedding provider
+        mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.get_table_name = Mock(return_value="chunks")
 
         # Call the function
-        await save_book(book_data, mock_book_service)
+        await save_book(book_data, mock_book_service, mock_embedding_provider)
 
         # Verify book creation was called
-        mock_book_service.create_book.assert_called_once_with(
-            pdf_navn="https://example.com/test.pdf",
-            titel="Test Book",
-            forfatter="Test Author",
-            antal_sider=10
+        mock_book_service.get_or_create_book.assert_called_once_with(
+            pdf_url="https://example.com/test.pdf",
+            title="Test Book",
+            author="Test Author",
+            pages=10
         )
 
-        # Verify chunk creation was called for each chunk
-        assert mock_book_service.create_chunk.call_count == 2
-        
-        # Check first chunk call
-        first_call = mock_book_service.create_chunk.call_args_list[0]
-        assert first_call[1]['book_id'] == 123
-        assert first_call[1]['sidenr'] == 1
-        assert first_call[1]['chunk'] == "Test chunk 1"
-        assert first_call[1]['embedding'] == [0.1, 0.2, 0.3]
+        # Verify chunks were saved with the correct table name
+        expected_chunks = [(1, "Test chunk 1", [0.1, 0.2, 0.3]), (2, "Test chunk 2", [0.4, 0.5, 0.6])]
+        mock_postgresql_service.save_chunks.assert_called_once_with(123, expected_chunks, "chunks")
 
     @pytest.mark.asyncio
     async def test_save_book_handles_service_errors(self):
@@ -218,43 +219,97 @@ class TestBookProcessingWithInjection:
 
         # Mock BookService that raises an exception
         mock_book_service = AsyncMock()  # Removed spec=BookService
-        mock_book_service.create_book.side_effect = Exception("Database error")
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_book_service.get_or_create_book.side_effect = Exception("Database error")
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
+        mock_postgresql_service.create_book.side_effect = Exception("Database error")
+        
+        # Mock embedding provider
+        mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.get_table_name = Mock(return_value="chunks")  # Sync method
 
         # Verify exception is propagated
         with pytest.raises(Exception, match="Database error"):
-            await save_book(book_data, mock_book_service)
+            await save_book(book_data, mock_book_service, mock_embedding_provider)
 
     @pytest.mark.asyncio
-    async def test_process_book_skips_existing_book(self):
-        """Test that process_book skips books that already exist."""
+    async def test_process_book_skips_existing_book_with_embeddings(self):
+        """Test that process_book skips books that already exist with embeddings for the provider."""
         book_url = "https://example.com/existing.pdf"
+        book_id = 123
         
-        # Mock BookService that returns an existing book
+        # Mock BookService and PostgreSQLService
         mock_book_service = AsyncMock()  # Removed spec=BookService
-        mock_book_service.get_book_by_pdf_navn.return_value = {"id": 123, "titel": "Existing Book"}
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = book_id
         
-        # Mock session and embedding provider
-        mock_session = AsyncMock()
+        # Mock embedding provider that has embeddings for this book
         mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.has_embeddings_for_book.return_value = True
+        mock_embedding_provider.get_provider_name = Mock(return_value="OpenAI")  # Use Mock for sync method
+        
+        # Mock session and chunking strategy
+        mock_session = AsyncMock()
         mock_chunking_strategy = Mock()
 
         # Call the function
         await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
 
         # Verify it checked for existing book
-        mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
+        mock_postgresql_service.find_book_by_url.assert_called_once_with(book_url)
+        
+        # Verify it checked for provider-specific embeddings
+        mock_embedding_provider.has_embeddings_for_book.assert_called_once_with(book_id, mock_postgresql_service)
         
         # Verify it didn't try to process the book further
         mock_session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_process_book_processes_existing_book_without_provider_embeddings(self):
+        """Test that process_book processes books that exist but don't have embeddings for the specific provider."""
+        book_url = "https://example.com/existing.pdf"
+        book_id = 123
+        
+        # Mock BookService and PostgreSQLService
+        mock_book_service = AsyncMock()
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = book_id
+        
+        # Mock embedding provider that does NOT have embeddings for this book
+        mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.has_embeddings_for_book.return_value = False
+        mock_embedding_provider.get_provider_name = Mock(return_value="Ollama")  # Use Mock for sync method
+        
+        # Mock session and chunking strategy
+        mock_session = AsyncMock()
+        mock_chunking_strategy = Mock()
+
+        # Mock fetch_pdf to return None (PDF not accessible) to test the flow
+        with patch('create_embeddings.opret_bøger.fetch_pdf', return_value=None) as mock_fetch:
+            await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
+
+            # Verify it checked for existing book
+            mock_postgresql_service.find_book_by_url.assert_called_once_with(book_url)
+            
+            # Verify it checked for provider-specific embeddings
+            mock_embedding_provider.has_embeddings_for_book.assert_called_once_with(book_id, mock_postgresql_service)
+            
+            # Verify it tried to fetch the PDF (processing continued)
+            mock_fetch.assert_called_once_with(book_url, mock_session)
 
     @pytest.mark.asyncio
     async def test_process_book_handles_new_book(self):
         """Test that process_book handles new books correctly."""
         book_url = "https://example.com/new.pdf"
         
-        # Mock BookService that returns None (book doesn't exist)
+        # Mock BookService and PostgreSQLService that returns None (book doesn't exist)
         mock_book_service = AsyncMock()  # Removed spec=BookService
-        mock_book_service.get_book_by_pdf_navn.return_value = None
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = None
         
         # Mock session and embedding provider
         mock_session = AsyncMock()
@@ -266,7 +321,7 @@ class TestBookProcessingWithInjection:
             await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
 
             # Verify it checked for existing book
-            mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
+            mock_postgresql_service.find_book_by_url.assert_called_once_with(book_url)
             
             # Verify it tried to fetch the PDF
             mock_fetch.assert_called_once_with(book_url, mock_session)
@@ -276,9 +331,11 @@ class TestBookProcessingWithInjection:
         """Test successful book processing end-to-end."""
         book_url = "https://example.com/new.pdf"
         
-        # Mock BookService
+        # Mock BookService and PostgreSQLService for new book
         mock_book_service = AsyncMock()  # Removed spec=BookService
-        mock_book_service.get_book_by_pdf_navn.return_value = None
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
         
         # Mock session and embedding provider
         mock_session = AsyncMock()
@@ -307,7 +364,7 @@ class TestBookProcessingWithInjection:
                     # Verify all steps were called
                     mock_fetch.assert_called_once_with(book_url, mock_session)
                     mock_parse.assert_called_once_with(mock_pdf, book_url, 1000, mock_embedding_provider, mock_chunking_strategy)
-                    mock_save.assert_called_once_with(mock_book_data, mock_book_service)
+                    mock_save.assert_called_once_with(mock_book_data, mock_book_service, mock_embedding_provider)
 
 
 @pytest.mark.unit
@@ -435,10 +492,14 @@ class TestBookProcessingIntegration:
         """Test book processing integration with real service instances."""
         # This test uses real service instances but mocked database connections
         
-        # We only need a mock book_service with the methods that save_book will call
+        # We need a mock book_service with the methods that save_book will call
         book_service = AsyncMock()
-        book_service.create_book.return_value = 123  # book_id
-        book_service.create_chunk.return_value = None
+        mock_postgresql_service = AsyncMock()
+        book_service._service = mock_postgresql_service
+        book_service.get_or_create_book = AsyncMock(return_value=123)  # Mock get_or_create_book
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
+        mock_postgresql_service.create_book.return_value = 123  # book_id
+        mock_postgresql_service.save_chunks.return_value = None
         
         # Test data
         book_data = {
@@ -456,26 +517,24 @@ class TestBookProcessingIntegration:
             ]
         }
         
+        # Mock embedding provider
+        mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.get_table_name = Mock(return_value="chunks")  # Sync method
+        
         # Call save_book with our mock service
-        await save_book(book_data, book_service)
+        await save_book(book_data, book_service, mock_embedding_provider)
         
         # Verify the service methods were called correctly
-        book_service.create_book.assert_called_once_with(
-            pdf_navn="https://example.com/integration-test.pdf",
-            titel="Integration Test Book",
-            forfatter="Test Author",
-            antal_sider=5
+        book_service.get_or_create_book.assert_called_once_with(
+            pdf_url="https://example.com/integration-test.pdf",
+            title="Integration Test Book",
+            author="Test Author",
+            pages=5
         )
         
-        # Should have called create_chunk twice (once for each chunk)
-        assert book_service.create_chunk.call_count == 2
-        
-        # Check first chunk call with correct arguments
-        first_call = book_service.create_chunk.call_args_list[0]
-        assert first_call[1]['book_id'] == 123
-        assert first_call[1]['sidenr'] == 1
-        assert first_call[1]['chunk'] == "Integration test chunk 1"
-        assert first_call[1]['embedding'] == [0.1, 0.2, 0.3, 0.4]
+        # Verify chunks were saved with the correct table name
+        expected_chunks = [(1, "Integration test chunk 1", [0.1, 0.2, 0.3, 0.4]), (2, "Integration test chunk 2", [0.5, 0.6, 0.7, 0.8])]
+        mock_postgresql_service.save_chunks.assert_called_once_with(123, expected_chunks, "chunks")
 
     @pytest.mark.asyncio
     async def test_full_book_processing_workflow(self):
@@ -497,7 +556,9 @@ class TestBookProcessingIntegration:
                 
                 # Mock services - create a mock BookService with the methods expected by process_book
                 book_service = AsyncMock()
-                book_service.get_book_by_pdf_navn.return_value = None  # Book doesn't exist
+                postgresql_service = AsyncMock()
+                book_service._service = postgresql_service
+                postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
                 book_service.create_book.return_value = 456  # book_id
                 book_service.create_chunk.return_value = None
                 
@@ -594,10 +655,18 @@ class TestBookProcessingErrorHandling:
         
         # Use plain AsyncMock without spec to allow setting any methods we need
         mock_book_service = AsyncMock()
-        mock_book_service.create_book.side_effect = Exception("Database connection failed")
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_book_service.get_or_create_book.side_effect = Exception("Database connection failed")
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
+        mock_postgresql_service.create_book.side_effect = Exception("Database connection failed")
+        
+        # Mock embedding provider
+        mock_embedding_provider = AsyncMock()
+        mock_embedding_provider.get_table_name = Mock(return_value="chunks")  # Sync method
         
         with pytest.raises(Exception, match="Database connection failed"):
-            await save_book(book_data, mock_book_service)
+            await save_book(book_data, mock_book_service, mock_embedding_provider)
             
     @pytest.mark.asyncio
     async def test_process_book_network_error_handling(self):
@@ -606,7 +675,9 @@ class TestBookProcessingErrorHandling:
         
         # Use plain AsyncMock without spec to allow setting any methods we need
         mock_book_service = AsyncMock()
-        mock_book_service.get_book_by_pdf_navn.return_value = None
+        mock_postgresql_service = AsyncMock()
+        mock_book_service._service = mock_postgresql_service
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
         
         # Mock session and embedding provider
         mock_session = AsyncMock()
@@ -619,4 +690,4 @@ class TestBookProcessingErrorHandling:
             await process_book(book_url, 1000, mock_book_service, mock_session, mock_embedding_provider, mock_chunking_strategy)
             
             # Should have checked for existing book
-            mock_book_service.get_book_by_pdf_navn.assert_called_once_with(book_url)
+            mock_postgresql_service.find_book_by_url.assert_called_once_with(book_url)

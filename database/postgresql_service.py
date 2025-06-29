@@ -115,10 +115,16 @@ class PostgreSQLService:
         self._ensure_connected()
         return await self._book_repository.create_book(pdf_url, title, author, pages)
     
-    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]]) -> None:
-        """Save chunks and their embeddings for a book."""
+    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]], table_name: str = "chunks") -> None:
+        """Save chunks and their embeddings for a book.
+        
+        Args:
+            book_id: The database ID of the book
+            chunks_with_embeddings: List of tuples containing (page_nr, chunk_text, embedding)
+            table_name: Name of the table to store chunks in (default: "chunks")
+        """
         self._ensure_connected()
-        return await self._book_repository.save_chunks(book_id, chunks_with_embeddings)
+        return await self._book_repository.save_chunks(book_id, chunks_with_embeddings, table_name)
     
     async def vector_search(
         self, 
@@ -245,6 +251,43 @@ class BookService:
         except Exception as e:
             logger.exception(f"Databasefejl ved query '{query}' for {url}: {e}")
             return None
+    
+    async def get_or_create_book(self, pdf_url: str, title: str = None, author: str = None, pages: int = None) -> int:
+        """
+        Get an existing book by URL or create a new one if it doesn't exist.
+        
+        This method enables metadata reuse - if a book already exists in the database,
+        its existing metadata is preserved. New metadata is only used if the book
+        doesn't exist yet.
+        
+        Args:
+            pdf_url: The PDF URL to search for
+            title: Title to use if creating a new book (optional if book exists)
+            author: Author to use if creating a new book (optional if book exists)  
+            pages: Page count to use if creating a new book (optional if book exists)
+            
+        Returns:
+            int: The book ID (either existing or newly created)
+            
+        Raises:
+            ValueError: If book doesn't exist and required metadata is missing
+        """
+        # First try to find existing book
+        existing_book_id = await self._service.find_book_by_url(pdf_url)
+        
+        if existing_book_id:
+            # Book already exists - return its ID
+            return existing_book_id
+        
+        # Book doesn't exist - validate we have metadata to create it
+        if not title or not author or not pages or pages <= 0:
+            raise ValueError(
+                f"Book not found at {pdf_url} and insufficient metadata provided to create it. "
+                f"Required: title, author, pages (>0). Provided: title={title}, author={author}, pages={pages}"
+            )
+        
+        # Create new book with provided metadata
+        return await self._service.create_book(pdf_url, title, author, pages)
 
 
 # Convenience functions for easy integration

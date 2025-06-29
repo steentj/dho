@@ -1,5 +1,6 @@
 import asyncio
 import unittest.mock as mock
+from unittest.mock import AsyncMock
 import sys
 import os
 
@@ -17,10 +18,14 @@ class MockBookService:
         self.books = {}
         self.chunks = []
         self.next_book_id = 1
+        # Create a mock PostgreSQL service
+        self._service = AsyncMock()
+        self._service.find_book_by_url = self._find_book_by_url
     
-    async def get_book_by_pdf_navn(self, pdf_navn):
-        """Return existing book if found, None otherwise"""
-        return self.books.get(pdf_navn)
+    async def _find_book_by_url(self, pdf_url):
+        """Internal method to find book by URL, returns book ID if found"""
+        book = self.books.get(pdf_url)
+        return book["id"] if book else None
     
     async def create_book(self, pdf_navn, titel, forfatter, antal_sider):
         """Create a new book and return its ID"""

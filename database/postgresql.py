@@ -94,10 +94,22 @@ class PostgreSQLBookRepository(BookRepository):
             raise RuntimeError("Failed to create book - no ID returned")
         return book_id
     
-    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]]) -> None:
-        """Save chunks and their embeddings for a book."""
-        query = """
-            INSERT INTO chunks (book_id, sidenr, chunk, embedding) 
+    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]], table_name: str = "chunks") -> None:
+        """Save chunks and their embeddings for a book.
+        
+        Args:
+            book_id: The database ID of the book
+            chunks_with_embeddings: List of tuples containing (page_nr, chunk_text, embedding)
+            table_name: Name of the table to store chunks in (default: "chunks")
+        """
+        # Validate table name to prevent SQL injection
+        allowed_tables = {"chunks", "chunks_nomic", "chunks_large", "chunks_small", "chunks_tiny"}
+        if table_name not in allowed_tables:
+            raise ValueError(f"Invalid table name: {table_name}. Allowed tables: {allowed_tables}")
+            
+        # Use the provided table name in the query
+        query = f"""
+            INSERT INTO {table_name} (book_id, sidenr, chunk, embedding) 
             VALUES ($1, $2, $3, $4)
         """
         

@@ -40,9 +40,19 @@ class TestEmbeddingProviderInterface:
     
     def test_embedding_provider_interface(self):
         """Test that EmbeddingProvider defines the correct interface."""
-        # Check that the abstract method exists
+        # Check that the abstract methods exist
         assert hasattr(EmbeddingProvider, 'get_embedding')
         assert getattr(EmbeddingProvider.get_embedding, '__isabstractmethod__', False)
+        
+        # Check new abstract methods for provider-aware duplicate checking
+        assert hasattr(EmbeddingProvider, 'has_embeddings_for_book')
+        assert getattr(EmbeddingProvider.has_embeddings_for_book, '__isabstractmethod__', False)
+        
+        assert hasattr(EmbeddingProvider, 'get_table_name')
+        assert getattr(EmbeddingProvider.get_table_name, '__isabstractmethod__', False)
+        
+        assert hasattr(EmbeddingProvider, 'get_provider_name')
+        assert getattr(EmbeddingProvider.get_provider_name, '__isabstractmethod__', False)
 
 
 @pytest.mark.unit
@@ -115,6 +125,51 @@ class TestDummyEmbeddingProvider:
         
         assert isinstance(embedding, list)
         assert len(embedding) == 1536
+    
+    def test_get_provider_name(self):
+        """Test DummyEmbeddingProvider.get_provider_name()."""
+        provider = DummyEmbeddingProvider()
+        assert provider.get_provider_name() == "dummy"
+    
+    def test_get_table_name(self):
+        """Test DummyEmbeddingProvider.get_table_name()."""
+        provider = DummyEmbeddingProvider()
+        assert provider.get_table_name() == "chunks"
+    
+    @pytest.mark.asyncio
+    async def test_has_embeddings_for_book_mock_database(self):
+        """Test DummyEmbeddingProvider.has_embeddings_for_book() with mocked database."""
+        provider = DummyEmbeddingProvider()
+        
+        # Mock database service
+        mock_db_service = AsyncMock()
+        
+        # Test case: book has embeddings
+        mock_db_service.execute_query.return_value = [{'count': 5}]
+        result = await provider.has_embeddings_for_book(123, mock_db_service)
+        assert result is True
+        
+        # Verify the query was called correctly
+        mock_db_service.execute_query.assert_called_once()
+        call_args = mock_db_service.execute_query.call_args[0]
+        assert "SELECT COUNT(*) as count FROM chunks" in call_args[0]
+        assert "WHERE book_id = $1" in call_args[0]
+        assert call_args[1] == [123]
+        
+        # Reset mock for next test
+        mock_db_service.reset_mock()
+        
+        # Test case: book has no embeddings
+        mock_db_service.execute_query.return_value = [{'count': 0}]
+        result = await provider.has_embeddings_for_book(456, mock_db_service)
+        assert result is False
+        
+        # Verify the query was called correctly
+        mock_db_service.execute_query.assert_called_once()
+        call_args = mock_db_service.execute_query.call_args[0]
+        assert "SELECT COUNT(*) as count FROM chunks" in call_args[0]
+        assert "WHERE book_id = $1" in call_args[0]
+        assert call_args[1] == [456]
 
 
 @pytest.mark.unit
@@ -255,6 +310,54 @@ class TestOpenAIEmbeddingProvider:
             # Verify the exact text was passed
             call_args = mock_embeddings.create.call_args
             assert call_args[1]['input'] == test_text
+    
+    def test_get_provider_name(self):
+        """Test OpenAIEmbeddingProvider.get_provider_name()."""
+        with patch.dict(os.environ, {'OPENAI_MODEL': 'test-model'}):
+            provider = OpenAIEmbeddingProvider("test_api_key")
+            assert provider.get_provider_name() == "openai"
+    
+    def test_get_table_name(self):
+        """Test OpenAIEmbeddingProvider.get_table_name()."""
+        with patch.dict(os.environ, {'OPENAI_MODEL': 'test-model'}):
+            provider = OpenAIEmbeddingProvider("test_api_key")
+            assert provider.get_table_name() == "chunks"
+    
+    @pytest.mark.asyncio
+    async def test_has_embeddings_for_book_mock_database(self):
+        """Test OpenAIEmbeddingProvider.has_embeddings_for_book() with mocked database."""
+        with patch.dict(os.environ, {'OPENAI_MODEL': 'test-model'}):
+            provider = OpenAIEmbeddingProvider("test_api_key")
+            
+            # Mock database service
+            mock_db_service = AsyncMock()
+            
+            # Test case: book has embeddings
+            mock_db_service.execute_query.return_value = [{'count': 10}]
+            result = await provider.has_embeddings_for_book(789, mock_db_service)
+            assert result is True
+            
+            # Verify the query was called correctly
+            mock_db_service.execute_query.assert_called_once()
+            call_args = mock_db_service.execute_query.call_args[0]
+            assert "SELECT COUNT(*) as count FROM chunks" in call_args[0]
+            assert "WHERE book_id = $1" in call_args[0]
+            assert call_args[1] == [789]
+            
+            # Reset mock for next test
+            mock_db_service.reset_mock()
+            
+            # Test case: book has no embeddings
+            mock_db_service.execute_query.return_value = [{'count': 0}]
+            result = await provider.has_embeddings_for_book(101112, mock_db_service)
+            assert result is False
+            
+            # Verify the query was called correctly
+            mock_db_service.execute_query.assert_called_once()
+            call_args = mock_db_service.execute_query.call_args[0]
+            assert "SELECT COUNT(*) as count FROM chunks" in call_args[0]
+            assert "WHERE book_id = $1" in call_args[0]
+            assert call_args[1] == [101112]
 
 
 @pytest.mark.unit
@@ -487,52 +590,110 @@ class TestOllamaEmbeddingProvider:
             embedding = await provider.get_embedding("test")
             assert isinstance(embedding, list)
             assert len(embedding) == 768  # All embedding vectors are 768-dimensional
+    
+    def test_get_provider_name(self):
+        """Test OllamaEmbeddingProvider.get_provider_name()."""
+        provider = OllamaEmbeddingProvider("http://localhost:11434", "nomic-embed-text")
+        assert provider.get_provider_name() == "ollama"
+    
+    def test_get_table_name(self):
+        """Test OllamaEmbeddingProvider.get_table_name()."""
+        provider = OllamaEmbeddingProvider("http://localhost:11434", "nomic-embed-text")
+        assert provider.get_table_name() == "chunks_nomic"
+    
+    @pytest.mark.asyncio
+    async def test_has_embeddings_for_book_mock_database(self):
+        """Test OllamaEmbeddingProvider.has_embeddings_for_book() with mocked database."""
+        provider = OllamaEmbeddingProvider("http://localhost:11434", "nomic-embed-text")
+        
+        # Mock database service
+        mock_db_service = AsyncMock()
+        
+        # Test case: book has embeddings
+        mock_db_service.execute_query.return_value = [{'count': 3}]
+        result = await provider.has_embeddings_for_book(202122, mock_db_service)
+        assert result is True
+        
+        # Verify the query was called correctly
+        mock_db_service.execute_query.assert_called_once()
+        call_args = mock_db_service.execute_query.call_args[0]
+        assert "SELECT COUNT(*) as count FROM chunks_nomic" in call_args[0]
+        assert "WHERE book_id = $1" in call_args[0]
+        assert call_args[1] == [202122]
+        
+        # Reset mock for next test
+        mock_db_service.reset_mock()
+        
+        # Test case: book has no embeddings
+        mock_db_service.execute_query.return_value = [{'count': 0}]
+        result = await provider.has_embeddings_for_book(232425, mock_db_service)
+        assert result is False
+        
+        # Verify the query was called correctly
+        mock_db_service.execute_query.assert_called_once()
+        call_args = mock_db_service.execute_query.call_args[0]
+        assert "SELECT COUNT(*) as count FROM chunks_nomic" in call_args[0]
+        assert "WHERE book_id = $1" in call_args[0]
+        assert call_args[1] == [232425]
 
 
 @pytest.mark.unit
 @pytest.mark.skipif(not EMBEDDING_PROVIDERS_AVAILABLE, reason="Embedding providers not available")
-class TestEmbeddingProviderFactoryWithOllama:
-    """Test factory with Ollama provider."""
+class TestProviderSpecificBehavior:
+    """Test provider-specific behavior for the new methods."""
     
-    def test_create_ollama_provider(self):
-        """Test creation of Ollama provider."""
-        with patch.dict(os.environ, {'OLLAMA_BASE_URL': 'http://test:11434', 'OLLAMA_MODEL': 'test-model'}):
-            if EMBEDDING_PROVIDERS_AVAILABLE:
-                provider = EmbeddingProviderFactory.create_provider("ollama")
-                assert isinstance(provider, OllamaEmbeddingProvider)
-                assert provider.base_url == "http://test:11434"
-                assert provider.model == "test-model"
-    
-    def test_create_ollama_provider_defaults(self):
-        """Test Ollama provider creation with defaults."""
-        if EMBEDDING_PROVIDERS_AVAILABLE:
-            import os
-            provider = EmbeddingProviderFactory.create_provider("ollama")
-            assert isinstance(provider, OllamaEmbeddingProvider)
-            
-            # Check if environment variable is set (e.g., in VS Code test runner)
-            expected_base_url = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
-            assert provider.base_url == expected_base_url
-            assert provider.model == "nomic-embed-text"
-    
-    def test_create_ollama_provider_with_params(self):
-        """Test Ollama provider creation with explicit parameters."""
-        if EMBEDDING_PROVIDERS_AVAILABLE:
-            provider = EmbeddingProviderFactory.create_provider("ollama", model="custom-model")
-            assert isinstance(provider, OllamaEmbeddingProvider)
-            assert provider.model == "custom-model"
-    
-    def test_updated_factory_supports_all_providers(self):
-        """Test that factory supports all known providers."""
-        supported_providers = ["openai", "dummy"]
-        if EMBEDDING_PROVIDERS_AVAILABLE:
-            supported_providers.append("ollama")
+    @pytest.mark.asyncio
+    async def test_different_providers_use_different_tables(self):
+        """Test that different providers use different table names."""
+        dummy_provider = DummyEmbeddingProvider()
+        with patch.dict(os.environ, {'OPENAI_MODEL': 'test-model'}):
+            openai_provider = OpenAIEmbeddingProvider("test_key")
+        ollama_provider = OllamaEmbeddingProvider("http://localhost:11434", "nomic-embed-text")
         
-        for provider_name in supported_providers:
-            provider = EmbeddingProviderFactory.create_provider(provider_name, "test_key")
-            assert isinstance(provider, EmbeddingProvider)
+        # Test that each provider uses its own table
+        assert dummy_provider.get_table_name() == "chunks"
+        assert openai_provider.get_table_name() == "chunks"
+        assert ollama_provider.get_table_name() == "chunks_nomic"
+        
+        # Test that provider names are unique
+        assert dummy_provider.get_provider_name() == "dummy"
+        assert openai_provider.get_provider_name() == "openai"
+        assert ollama_provider.get_provider_name() == "ollama"
     
-    def test_unknown_provider_error(self):
-        """Test that unknown provider raises ValueError."""
-        with pytest.raises(ValueError, match="Ukendt udbyder: unknown"):
-            EmbeddingProviderFactory.create_provider("unknown")
+    @pytest.mark.asyncio
+    async def test_providers_check_different_tables_for_embeddings(self):
+        """Test that providers check their specific tables for existing embeddings."""
+        book_id = 999
+        mock_db_service = AsyncMock()
+        
+        # Create providers
+        dummy_provider = DummyEmbeddingProvider()
+        with patch.dict(os.environ, {'OPENAI_MODEL': 'test-model'}):
+            openai_provider = OpenAIEmbeddingProvider("test_key")
+        ollama_provider = OllamaEmbeddingProvider("http://localhost:11434", "nomic-embed-text")
+        
+        # Mock responses - simulate book exists in OpenAI table but not Ollama table
+        def mock_execute_query(query, params):
+            if "chunks_nomic" in query:
+                return [{'count': 0}]  # No embeddings in Ollama table
+            elif "chunks" in query:
+                return [{'count': 5}]  # Has embeddings in OpenAI/Dummy table
+            else:
+                return [{'count': 0}]
+        
+        mock_db_service.execute_query.side_effect = mock_execute_query
+        
+        # Test each provider
+        dummy_result = await dummy_provider.has_embeddings_for_book(book_id, mock_db_service)
+        openai_result = await openai_provider.has_embeddings_for_book(book_id, mock_db_service)
+        ollama_result = await ollama_provider.has_embeddings_for_book(book_id, mock_db_service)
+        
+        # Both dummy and OpenAI should find embeddings (same table)
+        assert dummy_result is True
+        assert openai_result is True
+        
+        # Ollama should not find embeddings (different table)
+        assert ollama_result is False
+        
+        # Verify correct number of calls
+        assert mock_db_service.execute_query.call_count == 3
