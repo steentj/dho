@@ -145,8 +145,16 @@ class TestBookProcessorWrapperHighPriority:
     async def test_process_books_from_file_file_not_found(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
-            with pytest.raises(FileNotFoundError):
-                await wrapper.process_books_from_file("nonexistent.txt")
+            # Set up minimal valid environment to get past config validation
+            with patch.dict(os.environ, {
+                'POSTGRES_HOST': 'localhost',
+                'POSTGRES_USER': 'test',
+                'POSTGRES_PASSWORD': 'test',
+                'POSTGRES_DB': 'test',
+                'PROVIDER': 'dummy'
+            }, clear=True):
+                with pytest.raises(FileNotFoundError):
+                    await wrapper.process_books_from_file("nonexistent.txt")
 
 """
 Comprehensive tests for book processing with dependency injection.
@@ -439,7 +447,7 @@ class TestEmbeddingProviders:
 class TestBookProcessingIntegration:
     @pytest.mark.integration
     def test_wrapper_injects_alternate_chunking_strategy(self, monkeypatch):
-        """Test that BookProcessorWrapper injects an alternate chunking strategy (e.g., word_splitter) into process_book."""
+        """Test that BookProcessorWrapper injects an alternate chunking strategy (e.g., word_overlap) into process_book."""
         from create_embeddings.book_processor_wrapper import BookProcessorWrapper
         import tempfile
         import os
@@ -454,7 +462,7 @@ class TestBookProcessingIntegration:
                 f.write("https://example.com/book2.pdf\n")
 
             # Patch environment to use the temp input dir and alternate strategy
-            monkeypatch.setenv("CHUNKING_STRATEGY", "word_splitter")
+            monkeypatch.setenv("CHUNKING_STRATEGY", "word_overlap")
             monkeypatch.setenv("POSTGRES_DB", "dummy")
             monkeypatch.setenv("POSTGRES_USER", "dummy")
             monkeypatch.setenv("POSTGRES_PASSWORD", "dummy")
@@ -482,7 +490,7 @@ class TestBookProcessingIntegration:
                         wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
                         asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
                         # Assert the factory was called with the alternate strategy
-                        mock_factory.assert_called_with("word_splitter")
+                        mock_factory.assert_called_with("word_overlap")
                         # Assert process_book was called with the mock strategy
                         assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
     """Integration tests for book processing with dependency injection."""

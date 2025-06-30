@@ -78,6 +78,14 @@ class BookProcessorWrapper:
     
     async def process_books_from_file(self, input_file: str):
         """Process books using existing opret_bøger logic with monitoring and injectable chunking strategy"""
+        # Validate configuration before starting processing
+        try:
+            config = validate_config()
+            logging.info(f"Konfiguration valideret: {config['provider']} provider, {config['chunking_strategy']} chunking")
+        except ValueError as e:
+            logging.error(f"Konfigurationsfejl: {e}")
+            raise
+        
         input_file_path = Path("/app/input") / input_file
         if not input_file_path.exists():
             raise FileNotFoundError(f"Inputfil ikke fundet: {input_file_path}")
@@ -174,6 +182,58 @@ class BookProcessorWrapper:
         # Process using existing logic
         await self.process_books_from_file("retry_urls.txt")
 
+def validate_config():
+    """Omfattende konfigurationsvalidering"""
+    # Base påkrævede variabler
+    required_vars = ["POSTGRES_HOST", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"]
+    
+    # Provider-specifik validering
+    provider = os.getenv("PROVIDER", "ollama")
+    if provider == "openai":
+        required_vars.extend(["OPENAI_API_KEY"])
+    elif provider == "ollama":
+        required_vars.extend(["OLLAMA_BASE_URL", "OLLAMA_MODEL"])
+    elif provider != "dummy":
+        raise ValueError(f"Ukendt PROVIDER: {provider}. Skal være en af: openai, ollama, dummy")
+    
+    # Validér chunking strategy
+    chunking_strategy = os.getenv("CHUNKING_STRATEGY", "sentence_splitter")
+    valid_strategies = ["sentence_splitter", "word_overlap"]
+    if chunking_strategy not in valid_strategies:
+        raise ValueError(f"Ugyldig CHUNKING_STRATEGY: {chunking_strategy}. Skal være en af: {valid_strategies}")
+    
+    # Validér CHUNK_SIZE
+    chunk_size = os.getenv("CHUNK_SIZE", "500")
+    try:
+        chunk_size_int = int(chunk_size)
+        if chunk_size_int <= 0:
+            raise ValueError("CHUNK_SIZE skal være et positivt tal")
+    except ValueError as e:
+        if "invalid literal" in str(e):
+            raise ValueError(f"CHUNK_SIZE skal være et tal, ikke '{chunk_size}'")
+        raise
+    
+    # Validér LOG_LEVEL hvis sat
+    log_level = os.getenv("LOG_LEVEL")
+    if log_level:
+        valid_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if log_level.upper() not in valid_log_levels:
+            raise ValueError(f"Ugyldig LOG_LEVEL: {log_level}. Skal være en af: {valid_log_levels}")
+    
+    # Tjek for manglende variabler
+    missing = [var for var in required_vars if not os.getenv(var)]
+    if missing:
+        raise ValueError(f"Manglende påkrævede miljøvariabler: {missing}")
+    
+    # Returner valideret konfiguration for debugging
+    return {
+        "provider": provider,
+        "chunking_strategy": chunking_strategy,
+        "chunk_size": chunk_size_int,
+        "log_level": log_level,
+        "required_vars_present": len(required_vars) - len(missing)
+    }
+
 def main():
     """Main entry point with argument parsing"""
     
@@ -188,20 +248,23 @@ def main():
     wrapper.setup_logging()
     
     if args.validate_config:
-        # Validate existing environment variables
-        required_vars = ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", 
-                        "OPENAI_API_KEY", "PROVIDER"]
-        missing = [var for var in required_vars if not os.getenv(var)]
-        
-        if missing:
-            print(f"Manglende påkrævede miljøvariabler: {missing}")
-            sys.exit(1)
-        else:
-            print("✅ Alle påkrævede miljøvariabler er sat")
-            print(f"Embedding Model: {os.getenv('OPENAI_MODEL', 'text-embedding-ada-002')}")
-            print(f"Udbyder: {os.getenv('PROVIDER')}")
-            print(f"Chunk Størrelse: {os.getenv('CHUNK_SIZE', '500')}")
+        try:
+            config = validate_config()
+            print("✅ Alle påkrævede miljøvariabler er sat og gyldige")
+            print(f"Udbyder: {config['provider']}")
+            print(f"Chunking Strategy: {config['chunking_strategy']}")
+            print(f"Chunk Størrelse: {config['chunk_size']}")
+            if config['log_level']:
+                print(f"Log Level: {config['log_level']}")
+            if config['provider'] == 'openai':
+                print(f"OpenAI Model: {os.getenv('OPENAI_MODEL', 'text-embedding-3-small')}")
+            elif config['provider'] == 'ollama':
+                print(f"Ollama URL: {os.getenv('OLLAMA_BASE_URL')}")
+                print(f"Ollama Model: {os.getenv('OLLAMA_MODEL')}")
             sys.exit(0)
+        except ValueError as e:
+            print(f"❌ Konfigurationsfejl: {e}")
+            sys.exit(1)
     
     if args.retry_failed:
         asyncio.run(wrapper.retry_failed_books())

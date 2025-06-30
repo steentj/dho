@@ -1,9 +1,11 @@
 # Semantisk søgning i Danskernes Historie Online (Slægtsbiblioteket) - Proof of Concept
+
 Dette repository indeholder de Python programmer, der skal bruges for at undersøge om det er muligt og ønskeligt at udvide 
 søgemulighederne i Slægtsbiblioteket med en AI drevet semantisk søgning. 
 
 Filerne er organiseret i 2 foldere:
-- __create_embeddings__: Indeholder det batch-script, der: 
+
+- __create_embeddings__: Indeholder det batch-script, der:
   - indlæser bøger fra Slægtsbiblioteket
   - opdeler teksten i chunks
   - laver embeddings med OpenAI api for chunks
