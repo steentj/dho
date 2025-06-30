@@ -1,34 +1,39 @@
-# Brugervejledning til Bogbehandling
+# Bog Processering - Se Ny Dokumentation
 
-## Docker Brug - Ingen Container Terminal Påkrævet
+**⚠️ VIGTIG BESKED: Denne fil er blevet erstattet af ny struktureret dokumentation.**
 
-**Vigtigt**: Du kører alt fra din **værtsmaskine terminal** - du behøver aldrig at gå ind i Docker container terminaler. Systemet håndterer automatisk alle Docker operationer for dig.
+## 📚 **Ny Dokumentationsstruktur**
 
-## Hurtig Start
+Denne guide er blevet opdelt og forbedret i følgende nye dokumenter:
 
-### Forudsætninger
-1. Sørg for at Docker og Docker Compose er installeret
-2. Naviger til projektmappen:
-   ```bash
-   cd /sti/til/SlægtBib/src
-   ```
+### **Hovedoversigt**
+- **[README](README.md)** - Komplet systemoversigt
 
-### 1. Valider Konfiguration
-Først skal du sikre dig, at dit miljø er korrekt konfigureret:
+### **Brugerguider**
+- **[Installation Guide](BRUGERGUIDER/INSTALLATION.md)** - Detaljeret installationsvejledning
+- **[Bog Processering](BRUGERGUIDER/BOG_PROCESSERING.md)** - Komplet guide til bogbehandling
+- **[Lokal Udvikling](BRUGERGUIDER/LOKAL_UDVIKLING.md)** - Udvikling og debugging
 
-```bash
-./scripts/process_books.sh --validate
-```
+### **Konfiguration**
+- **[Konfigurationsguide](KONFIGURATION.md)** - Komplet konfigurationsreference
 
-**Hvad sker der**: Denne kommando starter automatisk en midlertidig Docker container, validerer din `.env` fil, og fjerner derefter containeren. Du forbliver i din værtsmaskine terminal hele tiden.
+### **Teknisk Dokumentation**
+- **[System Arkitektur](TEKNISK/ARKITEKTUR.md)** - Teknisk systemoversigt
+- **[Chunking Strategier](TEKNISK/CHUNKING_STRATEGIER.md)** - Detaljeret chunking guide
 
-### 2. Opret Bogliste  
-Opret en tekstfil **på din værtsmaskine** med én URL per linje:
+## 🚀 **Hurtig Navigation**
 
-```bash
-# Opret filen hvor som helst på din værtsmaskine
-nano mine_boeger.txt
-```
+**Ny bruger?** Start med [Installation Guide](BRUGERGUIDER/INSTALLATION.md)
+
+**Vil du processere bøger?** Se [Bog Processering](BRUGERGUIDER/BOG_PROCESSERING.md)
+
+**Konfigurationsproblemer?** Tjek [Konfigurationsguide](KONFIGURATION.md)
+
+**Udvikler?** Se [Lokal Udvikling](BRUGERGUIDER/LOKAL_UDVIKLING.md)
+
+---
+
+**Bemærk**: Denne fil vil blive fjernet i en fremtidig version. Brug venligst den nye strukturerede dokumentation.
 
 Indholdsformat (samme som eksisterende opret_bøger.py):
 ```
