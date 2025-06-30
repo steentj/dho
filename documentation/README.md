@@ -35,6 +35,7 @@ cp .env.template .env
 ### Teknisk Dokumentation
 - **[System Arkitektur](TEKNISK/ARKITEKTUR.md)** - Teknisk systemoversigt
 - **[Konfiguration](KONFIGURATION.md)** - Komplet konfigurationsreference
+- **[Konfigurationseksempler](EKSEMPLER/)** - Komplette .env eksempler for forskellige scenarier
 - **[Chunking Strategier](TEKNISK/CHUNKING_STRATEGIER.md)** - Guide til tekst chunking
 - **[API Reference](TEKNISK/API_REFERENCE.md)** - API dokumentation
 

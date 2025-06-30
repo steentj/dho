@@ -134,6 +134,28 @@ LOG_LEVEL=INFO                           # Valg: DEBUG, INFO, WARNING, ERROR
 
 ## 🚀 **Eksempel Konfigurationer**
 
+### Komplet Eksempel Directory
+Se **[EKSEMPLER/](EKSEMPLER/)** for komplette `.env` eksempler til forskellige scenarier:
+
+- **[Lokal Udvikling](EKSEMPLER/.env.lokalt.eksempel)** - Ollama, debug logging, udviklervenlig
+- **[Produktion](EKSEMPLER/.env.produktion.eksempel)** - OpenAI, sikkerhed, performance
+- **[Testing](EKSEMPLER/.env.test.eksempel)** - Dummy provider, CI/CD optimeret
+- **[Performance](EKSEMPLER/.env.performance.eksempel)** - Høj gennemstrømning, optimeret
+- **[Sikkerhed](EKSEMPLER/.env.sikkerhed.eksempel)** - Enterprise sikkerhed, compliance
+- **[Debugging](EKSEMPLER/.env.debugging.eksempel)** - Maksimal logging, fejlsøgning
+
+### Hurtig Start med Eksempler
+```bash
+# Vælg og kopiér relevant eksempel
+cp documentation/EKSEMPLER/.env.lokalt.eksempel .env
+
+# Tilpas til dine behov
+nano .env
+
+# Validér konfiguration
+./scripts/process_books.sh --validate
+```
+
 ### Lokal Udvikling med Ollama
 ```bash
 # Database
