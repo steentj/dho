@@ -307,3 +307,136 @@ class TestConfigurationValidation:
         }, clear=True):
             with pytest.raises(ValueError, match="Manglende påkrævede miljøvariabler.*OLLAMA_BASE_URL"):
                 validate_config()
+
+@pytest.mark.unit
+class TestCrossValidation:
+    """Test cross-validation functionality."""
+
+    def test_cross_validation_openai_vars_with_ollama_provider(self, caplog):
+        """Test warning when OpenAI variables are set but provider is Ollama."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'ollama',
+            'OLLAMA_BASE_URL': 'http://localhost:11434',
+            'OLLAMA_MODEL': 'nomic-embed-text',
+            # OpenAI vars set but not needed
+            'OPENAI_API_KEY': 'sk-test123',
+            'OPENAI_MODEL': 'text-embedding-3-small'
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'ollama'
+            # Check that warning was logged
+            assert any("OpenAI variabler" in record.message for record in caplog.records)
+            assert any("PROVIDER=ollama" in record.message for record in caplog.records)
+
+    def test_cross_validation_ollama_vars_with_openai_provider(self, caplog):
+        """Test warning when Ollama variables are set but provider is OpenAI."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'openai',
+            'OPENAI_API_KEY': 'sk-test123',
+            # Ollama vars set but not needed
+            'OLLAMA_BASE_URL': 'http://localhost:11434',
+            'OLLAMA_MODEL': 'nomic-embed-text'
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'openai'
+            # Check that warning was logged
+            assert any("Ollama variabler" in record.message for record in caplog.records)
+            assert any("PROVIDER=openai" in record.message for record in caplog.records)
+
+    def test_cross_validation_dummy_with_provider_vars(self, caplog):
+        """Test warning when dummy provider is set but other provider vars exist."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'dummy',
+            # Provider vars set but not needed for dummy
+            'OPENAI_API_KEY': 'sk-test123',
+            'OLLAMA_BASE_URL': 'http://localhost:11434'
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'dummy'
+            # Check that warning was logged
+            assert any("Provider variabler" in record.message for record in caplog.records)
+            assert any("PROVIDER=dummy" in record.message for record in caplog.records)
+            assert any("openai" in record.message.lower() or "ollama" in record.message.lower() for record in caplog.records)
+
+    def test_cross_validation_no_warnings_correct_config(self, caplog):
+        """Test no warnings when configuration is correct."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'openai',
+            'OPENAI_API_KEY': 'sk-test123'
+            # No irrelevant provider vars
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'openai'
+            # Check that no cross-validation warnings were logged
+            cross_validation_warnings = [record for record in caplog.records if "Cross-validation advarsel" in record.message]
+            assert len(cross_validation_warnings) == 0
+
+    def test_cross_validation_partial_openai_vars_with_ollama(self, caplog):
+        """Test warning when only some OpenAI variables are set with Ollama provider."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'ollama',
+            'OLLAMA_BASE_URL': 'http://localhost:11434',
+            'OLLAMA_MODEL': 'nomic-embed-text',
+            # Only OPENAI_MODEL set (not API key)
+            'OPENAI_MODEL': 'text-embedding-3-small'
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'ollama'
+            # Check that warning was logged for the set OpenAI variable
+            assert any("OPENAI_MODEL" in record.message for record in caplog.records)
+
+    def test_cross_validation_partial_ollama_vars_with_openai(self, caplog):
+        """Test warning when only some Ollama variables are set with OpenAI provider."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'openai',
+            'OPENAI_API_KEY': 'sk-test123',
+            # Only OLLAMA_MODEL set (not base URL)
+            'OLLAMA_MODEL': 'nomic-embed-text'
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'openai'
+            # Check that warning was logged for the set Ollama variable
+            assert any("OLLAMA_MODEL" in record.message for record in caplog.records)
+
+    def test_cross_validation_suggestion_for_dummy_provider(self, caplog):
+        """Test that suggestions are provided when using dummy provider with real provider vars."""
+        with patch.dict(os.environ, {
+            'POSTGRES_HOST': 'localhost',
+            'POSTGRES_USER': 'test',
+            'POSTGRES_PASSWORD': 'test',
+            'POSTGRES_DB': 'test',
+            'PROVIDER': 'dummy',
+            'OPENAI_API_KEY': 'sk-test123',
+            'OLLAMA_BASE_URL': 'http://localhost:11434',
+            'OLLAMA_MODEL': 'nomic-embed-text'
+        }, clear=True):
+            config = validate_config()
+            assert config['provider'] == 'dummy'
+            # Check that suggestion was logged
+            assert any("Overej at ændre PROVIDER" in record.message for record in caplog.records)
+            assert any("openai" in record.message for record in caplog.records)
+            assert any("ollama" in record.message for record in caplog.records)

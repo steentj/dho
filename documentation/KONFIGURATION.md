@@ -200,6 +200,28 @@ LOG_LEVEL=DEBUG
 python -c "from create_embeddings.book_processor_wrapper import validate_config; print(validate_config())"
 ```
 
+### Cross-Validation Funktionalitet
+
+Systemet udfører automatisk cross-validation for at sikre konsistens mellem `PROVIDER` indstilling og relaterede miljøvariabler:
+
+#### Automatiske Advarsler
+- **OpenAI variabler med ikke-OpenAI provider**: Advarer hvis `OPENAI_API_KEY` eller `OPENAI_MODEL` er sat, men `PROVIDER` ikke er `openai`
+- **Ollama variabler med ikke-Ollama provider**: Advarer hvis `OLLAMA_BASE_URL` eller `OLLAMA_MODEL` er sat, men `PROVIDER` ikke er `ollama`
+- **Provider variabler med dummy provider**: Foreslår at ændre provider hvis du har sat rigtige API konfigurationer
+
+#### Eksempel på Cross-Validation Advarsler
+```bash
+# Konfiguration med Ollama provider men OpenAI API key
+PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=nomic-embed-text
+OPENAI_API_KEY=sk-proj-xxxxx  # ← Trigger advarsel
+
+# Output:
+WARNING: Cross-validation advarsel: OpenAI variabler ['OPENAI_API_KEY'] er sat, 
+men PROVIDER=ollama. Disse variabler vil blive ignoreret.
+```
+
 ### Almindelige Fejl
 
 #### Manglende Provider Konfiguration

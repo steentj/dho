@@ -225,6 +225,46 @@ def validate_config():
     if missing:
         raise ValueError(f"Manglende påkrævede miljøvariabler: {missing}")
     
+    # Cross-validation: Tjek at provider-specifikke variabler matcher valgt provider
+    cross_validation_warnings = []
+    
+    # Tjek for OpenAI variabler når provider ikke er OpenAI
+    if provider != "openai":
+        openai_vars = ["OPENAI_API_KEY", "OPENAI_MODEL"]
+        set_openai_vars = [var for var in openai_vars if os.getenv(var)]
+        if set_openai_vars:
+            cross_validation_warnings.append(
+                f"OpenAI variabler {set_openai_vars} er sat, men PROVIDER={provider}. "
+                f"Disse variabler vil blive ignoreret."
+            )
+    
+    # Tjek for Ollama variabler når provider ikke er Ollama
+    if provider != "ollama":
+        ollama_vars = ["OLLAMA_BASE_URL", "OLLAMA_MODEL"]
+        set_ollama_vars = [var for var in ollama_vars if os.getenv(var)]
+        if set_ollama_vars:
+            cross_validation_warnings.append(
+                f"Ollama variabler {set_ollama_vars} er sat, men PROVIDER={provider}. "
+                f"Disse variabler vil blive ignoreret."
+            )
+    
+    # Tjek for manglende provider-specifikke variabler i relation til satte variabler
+    if provider == "dummy":
+        # Hvis dummy provider er valgt, men andre provider vars er sat, advar
+        all_provider_vars = ["OPENAI_API_KEY", "OPENAI_MODEL", "OLLAMA_BASE_URL", "OLLAMA_MODEL"]
+        set_provider_vars = [var for var in all_provider_vars if os.getenv(var)]
+        if set_provider_vars:
+            cross_validation_warnings.append(
+                f"Provider variabler {set_provider_vars} er sat, men PROVIDER=dummy. "
+                f"Overej at ændre PROVIDER til 'openai' eller 'ollama' for at bruge disse konfigurationer."
+            )
+    
+    # Log cross-validation warnings
+    if cross_validation_warnings:
+        import logging
+        for warning in cross_validation_warnings:
+            logging.warning(f"Cross-validation advarsel: {warning}")
+    
     # Returner valideret konfiguration for debugging
     return {
         "provider": provider,
