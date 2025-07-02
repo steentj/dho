@@ -153,8 +153,10 @@ class TestBookProcessorWrapperHighPriority:
                 'POSTGRES_DB': 'test',
                 'PROVIDER': 'dummy'
             }, clear=True):
-                with pytest.raises(FileNotFoundError):
-                    await wrapper.process_books_from_file("nonexistent.txt")
+                # Mock load_dotenv to prevent reading the real .env file
+                with patch("dotenv.load_dotenv"):
+                    with pytest.raises(FileNotFoundError):
+                        await wrapper.process_books_from_file("nonexistent.txt")
 
 """
 Comprehensive tests for book processing with dependency injection.
@@ -483,16 +485,18 @@ class TestBookProcessingIntegration:
                 with patch("create_embeddings.book_processor_wrapper.process_book", new_callable=AsyncMock) as mock_process_book:
                     # Patch asyncpg.create_pool to avoid real DB connection
                     with patch("database.postgresql.asyncpg.create_pool") as mock_create_pool:
-                        class DummyPool:
-                            async def __aenter__(self): return self
-                            async def __aexit__(self, exc_type, exc, tb): return False
-                        mock_create_pool.return_value = DummyPool()
-                        wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
-                        asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
-                        # Assert the factory was called with the alternate strategy
-                        mock_factory.assert_called_with("word_overlap")
-                        # Assert process_book was called with the mock strategy
-                        assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
+                        # CRITICAL: Mock load_dotenv to prevent reading the real .env file
+                        with patch("dotenv.load_dotenv"):
+                            class DummyPool:
+                                async def __aenter__(self): return self
+                                async def __aexit__(self, exc_type, exc, tb): return False
+                            mock_create_pool.return_value = DummyPool()
+                            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+                            asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
+                            # Assert the factory was called with the alternate strategy
+                            mock_factory.assert_called_with("word_overlap")
+                            # Assert process_book was called with the mock strategy
+                            assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
     """Integration tests for book processing with dependency injection."""
 
     @pytest.mark.asyncio
@@ -632,16 +636,18 @@ class TestBookProcessingIntegration:
                 with patch("create_embeddings.book_processor_wrapper.process_book", new_callable=AsyncMock) as mock_process_book:
                     # Patch asyncpg.create_pool to avoid real DB connection
                     with patch("database.postgresql.asyncpg.create_pool") as mock_create_pool:
-                        class DummyPool:
-                            async def __aenter__(self): return self
-                            async def __aexit__(self, exc_type, exc, tb): return False
-                        mock_create_pool.return_value = DummyPool()
-                        wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
-                        asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
-                        # Assert the factory was called with the env var
-                        mock_factory.assert_called_with("sentence_splitter")
-                        # Assert process_book was called with the mock strategy
-                        assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
+                        # CRITICAL: Mock load_dotenv to prevent reading the real .env file
+                        with patch("dotenv.load_dotenv"):
+                            class DummyPool:
+                                async def __aenter__(self): return self
+                                async def __aexit__(self, exc_type, exc, tb): return False
+                            mock_create_pool.return_value = DummyPool()
+                            wrapper = BookProcessorWrapper(output_dir=tmpdir, failed_dir=tmpdir)
+                            asyncio.run(wrapper.process_books_from_file("test_urls.txt"))
+                            # Assert the factory was called with the env var
+                            mock_factory.assert_called_with("sentence_splitter")
+                            # Assert process_book was called with the mock strategy
+                            assert any(call.args[-1] is mock_strategy for call in mock_process_book.call_args_list)
 
 
 @pytest.mark.unit

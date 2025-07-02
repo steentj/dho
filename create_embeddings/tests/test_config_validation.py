@@ -29,7 +29,7 @@ class TestConfigurationValidation:
             'CHUNKING_STRATEGY': 'sentence_splitter',
             'CHUNK_SIZE': '500',
             'LOG_LEVEL': 'INFO'
-        }):
+        }, clear=True):
             config = validate_config()
             assert config['provider'] == 'openai'
             assert config['chunking_strategy'] == 'sentence_splitter'
@@ -48,7 +48,7 @@ class TestConfigurationValidation:
             'OLLAMA_MODEL': 'nomic-embed-text',
             'CHUNKING_STRATEGY': 'word_overlap',
             'CHUNK_SIZE': '400'
-        }):
+        }, clear=True):
             config = validate_config()
             assert config['provider'] == 'ollama'
             assert config['chunking_strategy'] == 'word_overlap'
@@ -65,7 +65,7 @@ class TestConfigurationValidation:
             'PROVIDER': 'dummy',
             'CHUNKING_STRATEGY': 'sentence_splitter',
             'CHUNK_SIZE': '300'
-        }):
+        }, clear=True):
             config = validate_config()
             assert config['provider'] == 'dummy'
             assert config['chunking_strategy'] == 'sentence_splitter'

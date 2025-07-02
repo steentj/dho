@@ -189,6 +189,7 @@ def validate_config():
     
     # Provider-specifik validering
     provider = os.getenv("PROVIDER", "ollama")
+    print(f"Validerer konfiguration for PROVIDER={provider}")
     if provider == "openai":
         required_vars.extend(["OPENAI_API_KEY"])
     elif provider == "ollama":
