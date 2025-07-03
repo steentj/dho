@@ -12,13 +12,22 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install dependencies
-COPY requirements.txt .
+COPY create_embeddings/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the EXISTING opret_bøger.py and our wrapper
-COPY opret_bøger.py .
-COPY book_processor_wrapper.py .
-COPY logging_config.py .
+# Copy the entire create_embeddings package structure
+COPY create_embeddings/__init__.py ./create_embeddings/
+COPY create_embeddings/opret_bøger.py ./create_embeddings/
+COPY create_embeddings/book_processor_wrapper.py ./create_embeddings/
+COPY create_embeddings/logging_config.py ./create_embeddings/
+COPY create_embeddings/chunking.py ./create_embeddings/
+COPY create_embeddings/providers/ ./create_embeddings/providers/
+
+# Copy the database module for dependency injection
+COPY database/ ./database/
+
+# Copy the main wrapper script to app root for easy execution
+COPY create_embeddings/book_processor_wrapper.py .
 
 # Create directories
 RUN mkdir -p /app/input /app/output /app/failed

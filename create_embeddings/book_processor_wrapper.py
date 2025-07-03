@@ -7,14 +7,17 @@ from pathlib import Path
 from datetime import datetime
 import logging
 
-# Import ALL existing functionality from opret_bøger
-from .opret_bøger import (
+# Add the parent directory to the Python path for absolute imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Import ALL existing functionality from opret_bøger using absolute imports
+from create_embeddings.opret_bøger import (
     indlæs_urls,
     process_book,
 )
-from .providers import EmbeddingProviderFactory
-from .chunking import ChunkingStrategyFactory
-from .logging_config import setup_logging
+from create_embeddings.providers import EmbeddingProviderFactory
+from create_embeddings.chunking import ChunkingStrategyFactory
+from create_embeddings.logging_config import setup_logging
 
 class BookProcessorWrapper:
     """Wrapper around existing opret_bøger.py functionality"""

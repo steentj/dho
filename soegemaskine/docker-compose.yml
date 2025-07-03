@@ -67,8 +67,8 @@ services:
 
   book-processor:
     build:
-      context: ../create_embeddings
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: create_embeddings/Dockerfile
     container_name: dho-book-processor
     env_file:
       - .env
