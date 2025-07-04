@@ -245,6 +245,8 @@ class TestBookServiceBackwardsCompatibility:
             "embeddings": [[0.1, 0.2], [0.3, 0.4]]
         }
         
+        # Mock for new book workflow (enhanced behavior)
+        mock_postgresql_service.find_book_by_url.return_value = None  # Book doesn't exist
         mock_postgresql_service.create_book.return_value = 123
         
         # Mock transaction context manager
@@ -261,6 +263,7 @@ class TestBookServiceBackwardsCompatibility:
         
         # Verify it still works
         assert result == 123
+        mock_postgresql_service.find_book_by_url.assert_called_once()  # Now calls find first
         mock_postgresql_service.create_book.assert_called_once()
         mock_postgresql_service.save_chunks.assert_called_once()
 

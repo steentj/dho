@@ -2,7 +2,56 @@
 
 ## Oversigt
 
-Denne guide viser hvordan du tilføjer bøger til DHO Semantisk Søgemaskine systemet. Du kører alt fra din **værtsmaskine terminal** - du behøver aldrig at gå ind i Docker container terminaler.
+Denne guide viser hvordan du tilføjer bøger til DHO Semantisk Søgemaskine systemet. Du kører alt fra din **værtsmaskine terminal** - du behøver aldrig at gå ind i ## 🐳 **Container Management**
+
+### Hvornår Skal Containers Genbygges?
+
+**Rebuild book-processor container efter:**
+- ✅ Ændringer i `create_embeddings/*.py` filer
+- ✅ Database interface ændringer (`database/*.py`)
+- ✅ Dependency opdateringer (`requirements.txt`)
+- ✅ Chunking eller embedding provider ændringer
+
+**Rebuild IKKE nødvendigt efter:**
+- ❌ `.env` konfiguration ændringer
+- ❌ Bog liste opdateringer
+- ❌ Docker Compose environment variabler
+
+### Container Rebuild Procedure
+
+```bash
+# 1. Stop eksisterende containers
+cd soegemaskine
+docker-compose down
+
+# 2. Genbyg book-processor med kodeændringer
+docker-compose build book-processor
+
+# 3. Start alle services igen
+docker-compose --profile embeddings up -d
+
+# 4. Verificér at alt virker
+cd ..
+./scripts/process_books.sh --validate
+```
+
+### Debug Container Issues
+
+```bash
+# Tjek container status
+docker-compose ps
+
+# Se live logs
+docker-compose logs -f book-processor
+
+# Inspicer container indhold
+docker exec -it dho-book-processor ls -la /app
+
+# Tjek environment variabler i container
+docker exec -it dho-book-processor printenv | grep POSTGRES
+```
+
+## 🛠 **Konfiguration Troubleshooting**ocker container terminaler.
 
 ## 🚀 **Hurtig Start**
 
@@ -200,7 +249,60 @@ failed/
 └── error_details.log      # Fejl detaljer
 ```
 
-## 🐛 **Fejlfinding**
+## � **Konfiguration Troubleshooting**
+
+### Port Konfigurationsproblemer
+
+**Symptom:** `OSError: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0)`
+
+**Årsag:** Mismatch mellem den port PostgreSQL kører på og den port aplikationen prøver at forbinde til.
+
+**Diagnose:**
+```bash
+# Tjek hvilken port PostgreSQL faktisk kører på
+pg_isready -h localhost -p 5432   # Standard port
+pg_isready -h localhost -p 5433   # Alternativ port
+
+# Tjek din .env konfiguration
+grep POSTGRES_PORT .env
+
+# Tjek Docker port mapping
+docker ps | grep postgres
+```
+
+**Løsning:**
+
+1. **Verificér .env fil indeholder korrekt port:**
+   ```bash
+   # Sørg for denne linje er i din .env fil
+   POSTGRES_PORT=5433  # Eller hvilken port din database bruger
+   ```
+
+2. **Opdatér Docker Compose for container networking:**
+   ```bash
+   # I soegemaskine/docker-compose.yml under book-processor service:
+   environment:
+     - POSTGRES_HOST=postgres
+     - POSTGRES_PORT=5432  # Containers bruger port 5432 internt
+   ```
+
+3. **Genstart processing efter ændringer:**
+   ```bash
+   cd soegemaskine
+   docker-compose down
+   docker-compose build book-processor  # Nødvendigt efter kodeændringer
+   docker-compose --profile embeddings up -d
+   ./scripts/process_books.sh --validate
+   ```
+
+4. **Alternativt: Start PostgreSQL på standard port:**
+   ```bash
+   # Ændr docker-compose.yml til at bruge standard port
+   ports:
+     - "5432:5432"  # i stedet for "5433:5432"
+   ```
+
+## �🐛 **Fejlfinding**
 
 ### Almindelige Problemer
 
@@ -214,10 +316,20 @@ ls -la mine_boeger.txt
 
 #### Database Forbindelse Fejl
 ```bash
-# Problem: Kan ikke forbinde til database
-# Løsning: Start database service
+# Problem: "Multiple exceptions: [Errno 111] Connect call failed"
+# Årsag: Port mismatch mellem .env og kode
+
+# Løsning 1: Verificér database kører på korrekt port
+pg_isready -h localhost -p 5432  # Standard port
+pg_isready -h localhost -p 5433  # Hvis du bruger custom port
+
+# Løsning 2: Start database service
 cd soegemaskine
 docker-compose up -d postgres
+
+# Løsning 3: Tjek port konfiguration i .env
+grep POSTGRES_PORT .env
+# Skal matche den port database faktisk kører på
 
 # Verificér database
 docker ps | grep postgres

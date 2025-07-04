@@ -4,6 +4,7 @@ Integration tests for Phase 4: BookService Enhancement with metadata reuse.
 
 import pytest
 from unittest.mock import AsyncMock
+from contextlib import asynccontextmanager
 from database.postgresql_service import BookService
 from create_embeddings.opret_bøger import save_book
 from create_embeddings.providers.embedding_providers import DummyEmbeddingProvider
@@ -16,7 +17,15 @@ class TestBookServiceEnhancementIntegration:
     @pytest.fixture
     def mock_postgresql_service(self):
         """Create a mock PostgreSQL service."""
-        return AsyncMock()
+        service = AsyncMock()
+        
+        # Mock the transaction method to return a proper async context manager
+        @asynccontextmanager
+        async def mock_transaction():
+            yield
+        
+        service.transaction = mock_transaction
+        return service
 
     @pytest.fixture
     def book_service(self, mock_postgresql_service):

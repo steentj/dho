@@ -7,8 +7,8 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from opret_bøger import parse_book
-from chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy, ChunkingStrategyFactory
+from create_embeddings.opret_bøger import parse_book
+from create_embeddings.chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy, ChunkingStrategyFactory
 
 
 class MockBookService:

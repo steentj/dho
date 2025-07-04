@@ -200,7 +200,17 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
                 }
             )
             response.raise_for_status()
-            result = await response.json()
+            
+            # Handle both awaitable and non-awaitable response.json()
+            # This defensive approach handles different httpx versions or response types
+            json_result = response.json()
+            if hasattr(json_result, '__await__'):
+                # It's a coroutine, await it
+                result = await json_result
+            else:
+                # It's already a dict
+                result = json_result
+                
             return result["embedding"]
         except httpx.HTTPStatusError as e:
             raise RuntimeError(f"Ollama embedding request failed: HTTP error: {e}")

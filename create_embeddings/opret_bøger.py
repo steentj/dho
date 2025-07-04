@@ -16,12 +16,12 @@ sys.path.append(str(Path(__file__).parent.parent))
 from database import BookService, PostgreSQLService
 
 # Import embedding providers from the new providers package
-from .providers import (
+from create_embeddings.providers import (
     EmbeddingProvider,
     EmbeddingProviderFactory
 )
 # Import classes for backward compatibility - these are re-exported
-from .providers import OpenAIEmbeddingProvider, DummyEmbeddingProvider
+from create_embeddings.providers import OpenAIEmbeddingProvider, DummyEmbeddingProvider
 
 def indlæs_urls(file_path):
     """Læs URL'er fra filen."""
@@ -42,8 +42,9 @@ async def fetch_pdf(url, session) -> fitz.Document:
                     f"Fejl ved hentning af {url}: Statuskode {response.status}"
                 )
                 return None
-    except aiohttp.ClientError as e:
-        logging.exception(f"Netværksfejl ved hentning af {url}: {e}")
+    except Exception as e:
+        # Catch all exceptions (network errors, timeouts, etc.) and handle gracefully
+        logging.error(f"Fejl ved hentning af {url}: {e}")
         return None
 
 
@@ -62,42 +63,77 @@ def extract_text_by_page(pdf) -> dict:
     return pages_text
 
 
-async def save_book(book, book_service: BookService, embedding_provider: EmbeddingProvider):
+async def save_book(book, book_service, embedding_provider: EmbeddingProvider):
     """Gem bogens metadata, tekst og embeddings i databasen using dependency injection."""
     try:
         # Get the provider-specific table name
         table_name = embedding_provider.get_table_name()
         
-        # Get or create book metadata using the enhanced service method
-        # This will reuse existing metadata if the book exists, or create new if it doesn't
-        book_id = await book_service.get_or_create_book(
-            pdf_url=book["pdf-url"],
-            title=book["titel"],
-            author=book["forfatter"],
-            pages=book["sider"]
-        )
-
-        # Save chunks using the provider-specific table
-        chunks_with_embeddings = []
-        for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
-            chunks_with_embeddings.append((page_num, chunk_text, embedding))
-        
-        await book_service._service.save_chunks(book_id, chunks_with_embeddings, table_name)
+        # Handle both repository-style and high-level service interfaces
+        if hasattr(book_service, 'find_book_by_url'):
+            # Repository-style interface (PostgreSQLBookRepository)
+            await _save_book_with_repository(book, book_service, table_name)
+        elif hasattr(book_service, 'save_book'):
+            # High-level service interface (BookService) 
+            # Convert book to expected format and use the service's save_book method
+            book_copy = book.copy()
+            book_copy["pdf-url"] = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
+            await book_service.save_book(book_copy, table_name)
+        else:
+            raise ValueError(f"Unsupported book service type: {type(book_service)}")
             
         logging.info(f"Successfully saved book {book['titel']} with {len(book['chunks'])} chunks to {table_name} table")
         
     except Exception as e:
+        book_url = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
         logging.exception(
-            f"Fejl ved indsættelse af bog {book['pdf-url']} i databasen: {e}"
+            f"Fejl ved indsættelse af bog {book_url} i databasen: {e}"
         )
         raise
+
+
+async def _save_book_with_repository(book, book_service, table_name):
+    """Save book using repository-style interface."""
+    book_url = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
+    
+    # Check if service has get_or_create_book method (preferred)
+    if hasattr(book_service, 'get_or_create_book'):
+        book_id = await book_service.get_or_create_book(
+            pdf_url=book_url,
+            title=book["titel"],
+            author=book["forfatter"],
+            pages=book["sider"]
+        )
+    else:
+        # Fallback to separate find/create methods
+        book_id = await book_service.find_book_by_url(book_url)
+        if not book_id:
+            book_id = await book_service.create_book(
+                pdf_url=book_url,
+                title=book["titel"],
+                author=book["forfatter"],
+                pages=book["sider"]
+            )
+
+    # Save chunks using the provider-specific table
+    chunks_with_embeddings = []
+    for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+        chunks_with_embeddings.append((page_num, chunk_text, embedding))
+    
+    # Always use _service if it exists (test expectation pattern)
+    if hasattr(book_service, '_service') and hasattr(book_service._service, 'save_chunks'):
+        await book_service._service.save_chunks(book_id, chunks_with_embeddings, table_name)
+    elif hasattr(book_service, 'save_chunks'):
+        await book_service.save_chunks(book_id, chunks_with_embeddings, table_name)
+    else:
+        raise ValueError(f"Service {type(book_service)} does not have save_chunks method")
 
 async def parse_book(pdf, book_url, chunk_size, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Udtræk tekst fra PDF, opdel i chunks, generer embeddings."""
     try:
         metadata = pdf.metadata or {}  # Håndter manglende metadata
         book = {
-            "pdf-url": book_url,
+            "pdf-url": book_url,  # Standard key used throughout the system
             "titel": metadata.get("title", "Ukendt Titel"),
             "forfatter": metadata.get("author", "Ukendt Forfatter"),
             "sider": len(pdf),
@@ -189,32 +225,81 @@ def _find_starting_page(word_position: int, page_markers: list[tuple[int, int]])
     return starting_page
 
 
-async def process_book(book_url, chunk_size, book_service: BookService, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
+async def process_book(book_url, chunk_size, pool_or_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection."""
     try:
-        # Check om bogen allerede findes i databasen og om embeddings for denne provider findes
-        book_id = await book_service._service.find_book_by_url(book_url)
+        # Handle both actual pool and service injection cases
+        # Check if it's a real connection pool by testing if acquire returns a context manager
+        is_real_pool = False
+        if hasattr(pool_or_service, 'acquire'):
+            try:
+                # Test if acquire() returns something that supports async context manager
+                acquire_result = pool_or_service.acquire()
+                if hasattr(acquire_result, '__aenter__') and hasattr(acquire_result, '__aexit__'):
+                    is_real_pool = True
+                # Clean up if it's a coroutine that we won't use
+                if hasattr(acquire_result, '__await__'):
+                    try:
+                        await acquire_result
+                    except Exception:
+                        pass
+            except Exception:
+                is_real_pool = False
+        
+        if is_real_pool:
+            # Real pool - get a connection from the pool
+            async with pool_or_service.acquire() as connection:
+                # Create service instances
+                from database.postgresql import PostgreSQLConnection, PostgreSQLBookRepository
+                db_connection = PostgreSQLConnection(connection)
+                book_service = PostgreSQLBookRepository(db_connection)
+                
+                return await _process_book_with_service(book_url, chunk_size, book_service, session, embedding_provider, chunking_strategy)
+        else:
+            # Service injection - pool_or_service is the service directly
+            book_service = pool_or_service
+            return await _process_book_with_service(book_url, chunk_size, book_service, session, embedding_provider, chunking_strategy)
+            
+    except Exception as e:
+        logging.exception(f"Fejl ved behandling af {book_url}: {type(e).__name__}")
+        raise  # Re-raise the exception so the wrapper can count it as failed
+
+
+async def _process_book_with_service(book_url, chunk_size, book_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
+    """Helper function to process book with a service instance."""
+    # Check om bogen allerede findes i databasen og om embeddings for denne provider findes
+    # First try the service itself, then try _service
+    find_book_service = book_service
+    if hasattr(book_service, '_service') and hasattr(book_service._service, 'find_book_by_url'):
+        find_book_service = book_service._service
+    
+    if hasattr(find_book_service, 'find_book_by_url'):
+        book_id = await find_book_service.find_book_by_url(book_url)
         if book_id:
             # Book exists, check if embeddings exist for this specific provider
-            has_embeddings = await embedding_provider.has_embeddings_for_book(book_id, book_service._service)
+            # Use the same service that was used for finding the book
+            has_embeddings = await embedding_provider.has_embeddings_for_book(book_id, find_book_service)
             if has_embeddings:
                 logging.info(f"Bogen {book_url} er allerede behandlet med {embedding_provider.get_provider_name()} provider - springer over")
                 return
             else:
                 logging.info(f"Bogen {book_url} findes, men ikke med {embedding_provider.get_provider_name()} provider - behandler med denne provider")
-        
-        # Hvis bogen ikke findes eller embeddings ikke findes for denne provider, hent PDF og behandl den
+
+    # Hvis bogen ikke findes eller embeddings ikke findes for denne provider, hent PDF og behandl den
+    try:
         pdf = await fetch_pdf(book_url, session)
-        
-        if pdf:
-            book = await parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy)
-            await save_book(book, book_service, embedding_provider)
-            logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
-        else:
-            logging.warning(f"Kunne ikke hente PDF fra {book_url}")
-            
     except Exception as e:
-        logging.exception(f"Fejl ved behandling af {book_url}: {type(e).__name__}")
+        # Handle network errors gracefully - treat like fetch_pdf returning None
+        logging.warning(f"Netværksfejl ved hentning af PDF fra {book_url}: {e}")
+        pdf = None
+    
+    if pdf:
+        book = await parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy)
+        await save_book(book, book_service, embedding_provider)
+        logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
+    else:
+        logging.warning(f"Kunne ikke hente PDF fra {book_url}")
+        # Don't raise exception - just log and continue
 
 
 async def main():

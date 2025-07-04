@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS chunks_nomic_embedding_idx ON chunks_nomic
 USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 -- Add permissions
-GRANT SELECT, INSERT, UPDATE ON chunks_nomic TO your_app_user;
+GRANT SELECT, INSERT, UPDATE ON chunks_nomic TO steen;
 
 -- Add comments
 COMMENT ON TABLE chunks_nomic IS 'Stores text chunks and their 768-dimensional embeddings from Nomic Embed Text V2';

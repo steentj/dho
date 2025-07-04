@@ -249,6 +249,24 @@ sudo systemctl stop postgresql
 # Eller ændr port i docker-compose.yml
 ```
 
+### PostgreSQL Port Konfiguration
+
+```bash
+# Problem: "Multiple exceptions: [Errno 111] Connect call failed"
+# Årsag: Port mismatch mellem .env og faktisk database port
+
+# Diagnose: Tjek hvilken port database kører på
+pg_isready -h localhost -p 5432  # Standard port
+pg_isready -h localhost -p 5433  # Alternativ port
+
+# Løsning: Sæt korrekt port i .env
+echo "POSTGRES_PORT=5433" >> .env  # Hvis database kører på port 5433
+echo "POSTGRES_PORT=5432" >> .env  # Hvis database kører på standard port
+
+# Verificér konfiguration
+./scripts/process_books.sh --validate
+```
+
 ### Ollama Model Download Fejl
 
 ```bash
@@ -299,10 +317,44 @@ docker-compose --profile embeddings up -d --scale postgres=1
 # Hent seneste kode
 git pull origin main
 
-# Genstart services
+# Genbyg containers (nødvendigt efter kodeændringer)
 cd soegemaskine
-docker-compose down
+docker-compose build
+
+# Genstart services
 docker-compose --profile embeddings up -d
+```
+
+### Hvornår Skal Containers Genbygges?
+
+**Rebuild nødvendigt når:**
+- ✅ Python kode ændres (`*.py` filer)
+- ✅ `requirements.txt` opdateres  
+- ✅ `Dockerfile` modificeres
+- ✅ Dependency ændringer
+
+**Rebuild IKKE nødvendigt når:**
+- ❌ `.env` filer ændres (environment variabler)
+- ❌ Konfiguration opdateres
+- ❌ Input filer ændres
+
+### Container Management Kommandoer
+
+```bash
+# Genbyg specifik service
+docker-compose build book-processor
+
+# Genbyg alle services
+docker-compose build
+
+# Force rebuild (ignorer cache)
+docker-compose build --no-cache
+
+# Tjek container status
+docker-compose ps
+
+# Se container logs
+docker-compose logs book-processor
 ```
 
 ### Database Backup

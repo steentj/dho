@@ -79,6 +79,12 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 - **No Linting Errors**: All code must pass linting before proceeding
 - **Test Structure**: Well-organized test suites with clear separation
 
+### Critical Test Completion Rules
+- **MANDATORY FULL SUITE VALIDATION**: Always run all tests in the codebase and verify they are ALL passing before declaring any feature finished or problem solved
+- **PATIENCE WITH TEST EXECUTION**: When running all or a large number of tests, wait at least 15-20 seconds for complete execution - never assume tests are done prematurely
+- **NO PARTIAL COMPLETION CLAIMS**: Do not declare success based on partial test runs or individual test file results
+- **FULL VALIDATION COMMAND**: Always use `python -m pytest` (no file restrictions) as final validation step
+
 ### Testing Infrastructure
 
 **Key Testing Commands:**

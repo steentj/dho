@@ -305,7 +305,8 @@ class TestBookService:
             "embeddings": [[0.1, 0.2], [0.3, 0.4]]
         }
         
-        # Mock service responses
+        # Mock service responses for enhanced workflow
+        mock_service.find_book_by_url.return_value = None  # Book doesn't exist
         mock_service.create_book.return_value = 123
         
         # Mock transaction as an async context manager
@@ -318,8 +319,9 @@ class TestBookService:
         # Call save_book
         result = await book_service.save_book(book_data)
         
-        # Verify
+        # Verify enhanced workflow is used
         assert result == 123
+        mock_service.find_book_by_url.assert_called_once()  # Now calls find first
         mock_service.create_book.assert_called_once_with(
             "http://example.com/test.pdf",
             "Test Book", 
@@ -328,7 +330,7 @@ class TestBookService:
         )
         
         expected_chunks = [(1, "chunk1", [0.1, 0.2]), (2, "chunk2", [0.3, 0.4])]
-        mock_service.save_chunks.assert_called_once_with(123, expected_chunks)
+        mock_service.save_chunks.assert_called_once_with(123, expected_chunks, 'chunks')
     
     @pytest.mark.asyncio
     @patch.dict('os.environ', {'TESTING': 'true'})

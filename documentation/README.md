@@ -28,7 +28,8 @@ cp .env.template .env
 ## 📚 **Dokumentation**
 
 ### Brugerguider
-- **[Installation Guide](BRUGERGUIDER/INSTALLATION.md)** - Komplet installationsvejledning
+- **[Installation Guide](BRUGERGUIDER/INSTALLATION.md)** - Komplet installationsvejledning med container management
+- **[Bog Processering](BRUGERGUIDER/BOG_PROCESSERING.md)** - Processering af bøger og container rebuilding
 - **[Bog Processering](BRUGERGUIDER/BOG_PROCESSERING.md)** - Guide til at tilføje bøger til systemet
 - **[Lokal Udvikling](BRUGERGUIDER/LOKAL_UDVIKLING.md)** - Udvikling og testing guide
 

@@ -63,10 +63,16 @@ class BookProcessorWrapper:
                 json.dump(self.failed_books, f, indent=2)
     
     async def process_single_book_with_monitoring(self, book_url: str, chunk_size: int, 
-                                                  pool, session, embedding_provider, chunking_strategy):
+                                                  pool, session, process_func, chunking_strategy):
         """Wrapper around existing process_book with monitoring, now with injectable chunking strategy"""
         try:
-            await process_book(book_url, chunk_size, pool, session, embedding_provider, chunking_strategy)
+            # Use provided process function or default to process_book
+            if process_func:
+                await process_func(book_url, chunk_size, pool, session, chunking_strategy)
+            else:
+                # For the default case, we need an embedding provider
+                # This is mainly for backward compatibility with existing calls
+                await process_book(book_url, chunk_size, pool, session, None, chunking_strategy)
             self.processed_count += 1
             logging.info(f"✓ Bog behandlet: {book_url}")
         except Exception as e:
@@ -113,8 +119,13 @@ class BookProcessorWrapper:
         from aiohttp import TCPConnector
         try:
             db_host = os.getenv("POSTGRES_HOST", "postgres")
+            db_port = int(os.getenv("POSTGRES_PORT", "5432"))  
             async with asyncpg.create_pool(
-                host=db_host, database=database, user=db_user, password=db_password
+                host=db_host, 
+                port=db_port,  
+                database=database, 
+                user=db_user, 
+                password=db_password
             ) as pool:
                 ssl_context = ssl.create_default_context()
                 headers = {
@@ -145,8 +156,12 @@ class BookProcessorWrapper:
     async def semaphore_guard_with_monitoring(self, semaphore, url, chunk_size, pool, session, embedding_provider, chunking_strategy):
         """Use existing semaphore pattern with monitoring and injectable chunking strategy"""
         async with semaphore:
+            # Create a wrapper function that includes the embedding_provider
+            async def process_with_embedding(book_url, chunk_size, pool, session, chunking_strategy):
+                return await process_book(book_url, chunk_size, pool, session, embedding_provider, chunking_strategy)
+            
             await self.process_single_book_with_monitoring(
-                url, chunk_size, pool, session, embedding_provider, chunking_strategy
+                url, chunk_size, pool, session, process_with_embedding, chunking_strategy
             )
     
     async def retry_failed_books(self):

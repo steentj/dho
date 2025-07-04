@@ -197,9 +197,9 @@ class BookService:
     def __init__(self, service: PostgreSQLService):
         self._service = service
     
-    async def save_book(self, book: Dict[str, Any]) -> int:
+    async def save_book(self, book: Dict[str, Any], table_name: str = "chunks") -> int:
         """
-        Save a complete book with all its data.
+        Save a complete book with all its data using enhanced metadata reuse.
         
         Args:
             book: Dictionary with book data in the format used by opret_bøger.py
@@ -211,13 +211,14 @@ class BookService:
                       "chunks": List[Tuple[int, str]],  # (page_num, chunk_text)
                       "embeddings": List[List[float]]
                   }
+            table_name: Name of the table to save chunks to (provider-specific)
                   
         Returns:
             int: The book ID
         """
         async with self._service.transaction():
-            # Create the book record
-            book_id = await self._service.create_book(
+            # Use get_or_create_book for enhanced metadata reuse
+            book_id = await self.get_or_create_book(
                 book["pdf-url"],
                 book["titel"], 
                 book["forfatter"],
@@ -229,8 +230,8 @@ class BookService:
             for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
                 chunks_with_embeddings.append((page_num, chunk_text, embedding))
             
-            # Save all chunks
-            await self._service.save_chunks(book_id, chunks_with_embeddings)
+            # Save all chunks with the specified table name
+            await self._service.save_chunks(book_id, chunks_with_embeddings, table_name)
             
             return book_id
     
