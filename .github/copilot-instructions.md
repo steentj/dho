@@ -71,7 +71,11 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 2. **Tiny Steps**: Develop each phase in small, testable increments  
 3. **Test-Driven**: Create/update tests for each step
 4. **Manual Confirmation**: Always ask for confirmation before proceeding
-5. **Documentation**: Create/update markdown plans with to-do's for each phase
+5. **Documentation**: 
+    1. Create/update markdown plans with to-do's for each phase
+    2. All user docs in `/documentation/` must be Danish, technical, and concise
+    3. Documentation is stored as markdown files in `/documentation/` directory
+    4. Documents must have Creation date/time and Last Modified date/time at the top of the file
 
 ### Test Quality Standards
 - **No Overlaps**: Avoid testing same functionality in multiple places
@@ -153,7 +157,6 @@ async def lifespan(app: FastAPI):
 
 ## Project-Specific Conventions
 
-- **Danish Documentation**: All user docs in `/documentation/` must be Danish, technical, and concise
 - **One Class Per File**: Enforced development rule
 - **SOLID + GoF Patterns**: Architecture follows dependency injection throughout
 - **Test-Driven Development**: Write failing test → implement → refactor → repeat
