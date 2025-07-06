@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Create chunks_nomic table for 768-dimensional embeddings
 CREATE TABLE IF NOT EXISTS chunks_nomic (
-    id bigint PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     book_id integer REFERENCES books(id),
     sidenr integer NOT NULL,
     chunk text NOT NULL,

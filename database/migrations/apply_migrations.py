@@ -7,12 +7,30 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+# Try multiple common locations for .env file
+env_paths = [
+    '.env',  # Current working directory
+    'soegemaskine/.env',  # Common location when running from src
+    '../soegemaskine/.env',  # When running from subdirectory
+    Path(__file__).parent.parent.parent / 'soegemaskine' / '.env',  # Relative to script location
+]
+
+env_loaded = False
+for env_path in env_paths:
+    if Path(env_path).exists():
+        load_dotenv(dotenv_path=env_path, override=True)
+        logger.info(f"Loaded environment variables from: {env_path}")
+        env_loaded = True
+        break
+
+if not env_loaded:
+    logger.warning(f"No .env file found in any of the expected locations: {[str(p) for p in env_paths]}")
+    logger.info("Will use environment variables from the system")
 
 async def apply_migrations(conn):
     """Apply all migration files in order."""

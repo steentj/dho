@@ -175,3 +175,32 @@ async def lifespan(app: FastAPI):
 - **Database**: PostgreSQL with pgvector for vector similarity
 - **Embedding Storage**: Provider-specific table naming (chunks_openai, chunks_ollama, etc.)
 - **Chunking Impact**: sentence_splitter preserves context, word_overlap ensures consistent size
+
+## Critical Bug Fix: Vector Data Type Error
+
+**NEVER MAKE THIS ERROR AGAIN**: The production error `"expected str, got list"` occurs when `chunk_text` is passed as a list instead of string to PostgreSQL.
+
+### ✅ Correct Data Types
+```python
+# CORRECT: chunk_text must be string, embedding must be list
+chunks_with_embeddings = [(page_num, "chunk text as string", [0.1, 0.2, 0.3])]
+
+# WRONG: chunk_text as list causes PostgreSQL error  
+chunks_with_embeddings = [(page_num, ["word1", "word2"], [0.1, 0.2, 0.3])]
+```
+
+### 🛡️ Defensive Fix Applied
+In `/create_embeddings/opret_bøger.py`, always validate chunk_text:
+```python
+# Ensure chunk_text is always a string before database insertion
+if isinstance(chunk_text, list):
+    chunk_text = " ".join(str(item) for item in chunk_text)
+    logger.warning(f"Fixed chunk_text data type: converted list to string for page {page_num}")
+```
+
+### 🎯 Key Points
+- **Parameter $3** (chunk_text) expects string, **Parameter $4** (embedding) expects list
+- **pgvector handles lists correctly** for embeddings - the issue was NOT with vector data
+- **Root cause**: chunk_text becoming list due to environment-specific issues
+- **Solution**: Defensive type checking prevents crashes while logging incidents
+- **Tests**: See `test_defensive_fix.py` for validation coverage

@@ -6,12 +6,12 @@ import fitz  # PyMuPDF
 from dotenv import load_dotenv
 import os
 import logging
+import sys
+from pathlib import Path
 from create_embeddings.logging_config import setup_logging
 from create_embeddings.chunking import ChunkingStrategy, ChunkingStrategyFactory
 
 # Import our new dependency injection system
-import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from database import BookService, PostgreSQLService
 
@@ -22,6 +22,9 @@ from create_embeddings.providers import (
 )
 # Import classes for backward compatibility - these are re-exported
 from create_embeddings.providers import OpenAIEmbeddingProvider, DummyEmbeddingProvider
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 def indlæs_urls(file_path):
     """Læs URL'er fra filen."""
@@ -118,6 +121,17 @@ async def _save_book_with_repository(book, book_service, table_name):
     # Save chunks using the provider-specific table
     chunks_with_embeddings = []
     for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+        # DEFENSIVE FIX: Ensure chunk_text is always a string
+        # This prevents the "expected str, got list" PostgreSQL error
+        if isinstance(chunk_text, list):
+            # Join list elements into a single string
+            chunk_text = " ".join(str(item) for item in chunk_text)
+            logger.warning(f"Fixed chunk_text data type: converted list to string for page {page_num}")
+        elif not isinstance(chunk_text, str):
+            # Convert any other type to string
+            chunk_text = str(chunk_text)
+            logger.warning(f"Fixed chunk_text data type: converted {type(chunk_text)} to string for page {page_num}")
+            
         chunks_with_embeddings.append((page_num, chunk_text, embedding))
     
     # Always use _service if it exists (test expectation pattern)
