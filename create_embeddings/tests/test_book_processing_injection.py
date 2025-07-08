@@ -557,6 +557,7 @@ class TestBookProcessingIntegration:
                 # Setup mocks
                 mock_strategy_instance = Mock()
                 mock_strategy_instance.chunk_text.side_effect = [["chunk 1"], ["chunk 2"]]
+                mock_strategy_instance.supports_cross_page_chunking.return_value = False  # Use page-by-page processing
                 mock_pdf = Mock()
                 mock_pdf.metadata = {"title": "Workflow Test", "author": "Test Author"}
                 mock_pdf.close = Mock()

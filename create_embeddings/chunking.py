@@ -19,6 +19,19 @@ class ChunkingStrategy(ABC):
             An iterable of text chunks.
         """
         pass
+    
+    @abstractmethod
+    def supports_cross_page_chunking(self) -> bool:
+        """
+        Indicates whether this strategy supports cross-page chunking.
+        
+        Cross-page chunking allows chunks to span multiple PDF pages,
+        which is useful for maintaining context in overlapping strategies.
+        
+        Returns:
+            True if this strategy supports cross-page chunking, False otherwise.
+        """
+        pass
 
 def _add_title_to_chunk(chunk_sentences: list[str], title: str | None) -> list[str]:
     """Prepend title to the first sentence of a chunk if a title is provided."""
@@ -90,6 +103,19 @@ class SentenceSplitterChunkingStrategy(ChunkingStrategy):
         # Yield any remaining sentences in the last chunk
         if current_chunk_sentences:
             yield " ".join(_add_title_to_chunk(current_chunk_sentences, title))
+
+    def supports_cross_page_chunking(self) -> bool:
+        """
+        SentenceSplitterChunkingStrategy does not support cross-page chunking.
+        
+        This strategy processes text page-by-page to maintain page boundaries
+        and ensure each chunk is associated with a specific page for accurate
+        search result attribution.
+        
+        Returns:
+            False - this strategy processes pages individually
+        """
+        return False
 
 
 class WordOverlapChunkingStrategy(ChunkingStrategy):
@@ -210,6 +236,19 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
                 break
         
         return overlap_sentences, overlap_word_count
+
+    def supports_cross_page_chunking(self) -> bool:
+        """
+        WordOverlapChunkingStrategy supports cross-page chunking.
+        
+        This strategy creates chunks with overlapping content, which works
+        best when processing all pages together to create coherent chunks
+        that can span page boundaries while maintaining context.
+        
+        Returns:
+            True - this strategy benefits from cross-page processing
+        """
+        return True
 
 
 class ChunkingStrategyFactory:

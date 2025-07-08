@@ -157,9 +157,8 @@ async def parse_book(pdf, book_url, chunk_size, embedding_provider: EmbeddingPro
 
         pdf_pages = extract_text_by_page(pdf)
 
-        # Check if we're using WordOverlapChunkingStrategy for cross-page chunking
-        from create_embeddings.chunking import WordOverlapChunkingStrategy
-        if isinstance(chunking_strategy, WordOverlapChunkingStrategy):
+        # Use polymorphic method to determine chunking approach
+        if chunking_strategy.supports_cross_page_chunking():
             # Cross-page chunking: concatenate all pages and track page boundaries
             page_chunks = _process_cross_page_chunking(pdf_pages, chunk_size, chunking_strategy, book["titel"])
             

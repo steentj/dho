@@ -82,6 +82,7 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 - **Complete Coverage**: Ensure all critical paths are tested
 - **No Linting Errors**: All code must pass linting before proceeding
 - **Test Structure**: Well-organized test suites with clear separation
+- **Test complies to code**: Do not change production code solely to fit tests or accomodate test tools or functions, always adapt tests to match the code
 
 ### Critical Test Completion Rules
 - **MANDATORY FULL SUITE VALIDATION**: Always run all tests in the codebase and verify they are ALL passing before declaring any feature finished or problem solved
