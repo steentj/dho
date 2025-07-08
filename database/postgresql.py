@@ -200,6 +200,10 @@ class PostgreSQLDatabaseFactory(DatabaseFactory):
             logger.error(f"Failed to create database connection: {e}")
             raise
     
+    def wrap_pooled_connection(self, raw_connection) -> DatabaseConnection:
+        """Wrap an existing asyncpg connection (e.g., from a pool) as a DatabaseConnection."""
+        return PostgreSQLConnection(raw_connection)
+    
     def create_book_repository(self, connection: DatabaseConnection) -> BookRepository:
         """Create a book repository with the given connection."""
         return PostgreSQLBookRepository(connection)

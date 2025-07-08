@@ -346,35 +346,37 @@ class TestMainFunctionAndConfiguration:
                 with patch('create_embeddings.opret_bøger.load_dotenv'):
                     with patch('create_embeddings.opret_bøger.os.path.dirname', return_value=tmpdir):
                         with patch('create_embeddings.opret_bøger.os.path.abspath', return_value=os.path.join(tmpdir, 'fake_script.py')):
-                            with patch('create_embeddings.opret_bøger.PostgreSQLService') as mock_db_service_class:
-                                with patch('create_embeddings.opret_bøger.BookService') as mock_book_service_class:
-                                    with patch('create_embeddings.opret_bøger.setup_logging'):
-                                        with patch('aiohttp.ClientSession') as mock_session:
-                                            # Mock database service
-                                            mock_db_service = AsyncMock()
-                                            mock_db_service_class.return_value = mock_db_service
+                            with patch('database.factory.create_database_factory') as mock_db_factory_func:
+                                with patch('create_embeddings.opret_bøger.setup_logging'):
+                                    with patch('aiohttp.ClientSession') as mock_session:
+                                        # Mock database factory and connection
+                                        mock_db_factory = AsyncMock()
+                                        mock_db_connection = AsyncMock()
+                                        mock_book_service = AsyncMock()
+                                        
+                                        mock_db_factory_func.return_value = mock_db_factory
+                                        mock_db_factory.create_connection.return_value = mock_db_connection
+                                        mock_db_factory.create_book_repository.return_value = mock_book_service
+                                        
+                                        # Mock session context manager
+                                        mock_session_instance = AsyncMock()
+                                        mock_context_manager = AsyncMock()
+                                        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session_instance)
+                                        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+                                        mock_session.return_value = mock_context_manager
+                                        
+                                        # Mock asyncio.gather to avoid actual processing
+                                        with patch('asyncio.gather', new_callable=AsyncMock) as mock_gather:
+                                            await main()
                                             
-                                            # Mock book service  
-                                            mock_book_service = AsyncMock()
-                                            mock_book_service_class.return_value = mock_book_service
+                                            # Verify database factory was used to create connection and repository
+                                            mock_db_factory_func.assert_called_once()
+                                            mock_db_factory.create_connection.assert_called_once()
+                                            mock_db_factory.create_book_repository.assert_called_once_with(mock_db_connection)
+                                            mock_db_connection.close.assert_called_once()
                                             
-                                            # Mock session context manager
-                                            mock_session_instance = AsyncMock()
-                                            mock_context_manager = AsyncMock()
-                                            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session_instance)
-                                            mock_context_manager.__aexit__ = AsyncMock(return_value=None)
-                                            mock_session.return_value = mock_context_manager
-                                            
-                                            # Mock asyncio.gather to avoid actual processing
-                                            with patch('asyncio.gather', new_callable=AsyncMock) as mock_gather:
-                                                await main()
-                                                
-                                                # Verify database service was connected and disconnected
-                                                mock_db_service.connect.assert_called_once()
-                                                mock_db_service.disconnect.assert_called_once()
-                                                
-                                                # Verify tasks were created and gathered
-                                                mock_gather.assert_called_once()
+                                            # Verify tasks were created and gathered
+                                            mock_gather.assert_called_once()
 
 
 @pytest.mark.integration

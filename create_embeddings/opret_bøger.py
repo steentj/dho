@@ -13,7 +13,6 @@ from create_embeddings.chunking import ChunkingStrategy, ChunkingStrategyFactory
 
 # Import our new dependency injection system
 sys.path.append(str(Path(__file__).parent.parent))
-from database import BookService, PostgreSQLService
 
 # Import embedding providers from the new providers package
 from create_embeddings.providers import (
@@ -260,12 +259,15 @@ async def process_book(book_url, chunk_size, pool_or_service, session, embedding
                 is_real_pool = False
         
         if is_real_pool:
-            # Real pool - get a connection from the pool
+            # Real pool - get a connection from the pool and use factory to create services
             async with pool_or_service.acquire() as connection:
-                # Create service instances
-                from database.postgresql import PostgreSQLConnection, PostgreSQLBookRepository
-                db_connection = PostgreSQLConnection(connection)
-                book_service = PostgreSQLBookRepository(db_connection)
+                # Use database factory to create repository from pooled connection  
+                from database.factory import create_database_factory
+                
+                db_factory = create_database_factory()
+                # Use factory to wrap the pooled connection (maintains DI principles)
+                db_connection = db_factory.wrap_pooled_connection(connection)
+                book_service = db_factory.create_book_repository(db_connection)
                 
                 return await _process_book_with_service(book_url, chunk_size, book_service, session, embedding_provider, chunking_strategy)
         else:
@@ -344,14 +346,16 @@ async def main():
     url_file_path = os.path.join(script_dir, url_file)
     book_urls = indlæs_urls(url_file_path)
 
-    # Initialize database service using dependency injection
-    db_service = PostgreSQLService(database_url)
-    book_service = BookService(db_service)
+    # Initialize database service using factory pattern (dependency injection)
+    from database.factory import create_database_factory
+    
+    db_factory = create_database_factory()
+    db_connection = await db_factory.create_connection()
+    book_service = db_factory.create_book_repository(db_connection)
 
     try:
-        # Connect to database
-        await db_service.connect()
-        logging.info("Database service connected using dependency injection")
+        # Database connection is already established by factory
+        logging.info("Database connection created using factory pattern")
 
         # Create HTTP session
         ssl_context = ssl.create_default_context()
@@ -374,8 +378,8 @@ async def main():
         logging.exception(f"Fatal fejl i hovedprogrammet: {type(e).__name__}")
     finally:
         # Cleanup database connection
-        await db_service.disconnect()
-        logging.info("Database service disconnected")
+        await db_connection.close()
+        logging.info("Database connection closed")
 
 
 async def semaphore_guard(coro, semaphore, *args):
