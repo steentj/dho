@@ -143,7 +143,7 @@ class TestEmbeddingProviderFactoryWithOllama:
     
     def test_unknown_provider_error(self):
         """Test that unknown provider raises ValueError."""
-        with pytest.raises(ValueError, match="Ukendt udbyder: unknown"):
+        with pytest.raises(ValueError, match="Unknown embedding provider: unknown"):
             EmbeddingProviderFactory.create_provider("unknown")
 
 

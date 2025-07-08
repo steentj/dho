@@ -195,7 +195,7 @@ class TestEmbeddingProviderFactory:
     
     def test_create_unknown_provider(self):
         """Test error handling for unknown provider."""
-        with pytest.raises(ValueError, match="Ukendt udbyder: unknown"):
+        with pytest.raises(ValueError, match="Unknown embedding provider: unknown"):
             EmbeddingProviderFactory.create_provider("unknown", "test_key")
 
 

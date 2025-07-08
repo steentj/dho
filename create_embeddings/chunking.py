@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import re
-from typing import Iterable
+import os
+from typing import Iterable, Dict, Type
+
 
 class ChunkingStrategy(ABC):
     """Interface for different text chunking strategies."""
@@ -251,6 +253,55 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
         return True
 
 
+class ChunkingStrategyRegistry:
+    """Registry for chunking strategy implementations."""
+    
+    _strategies: Dict[str, Type[ChunkingStrategy]] = {
+        "sentence_splitter": SentenceSplitterChunkingStrategy,
+        "word_overlap": WordOverlapChunkingStrategy,
+    }
+    
+    @classmethod
+    def register_strategy(cls, name: str, strategy_class: Type[ChunkingStrategy]) -> None:
+        """Register a new chunking strategy."""
+        cls._strategies[name] = strategy_class
+    
+    @classmethod
+    def create_strategy(cls, strategy_name: str = None, **kwargs) -> ChunkingStrategy:
+        """
+        Create a chunking strategy instance.
+        
+        Args:
+            strategy_name: Name of the strategy to create. 
+                          If None, uses CHUNKING_STRATEGY environment variable or defaults to 'sentence_splitter'
+            **kwargs: Additional arguments passed to strategy constructor
+            
+        Returns:
+            ChunkingStrategy instance
+            
+        Raises:
+            ValueError: If strategy_name is unknown, None and no default available, or empty
+        """
+        if strategy_name is None:
+            strategy_name = os.getenv("CHUNKING_STRATEGY", "sentence_splitter")
+        
+        if not strategy_name or not strategy_name.strip():
+            raise ValueError("Strategy name cannot be empty")
+            
+        strategy_name = strategy_name.lower()  # Make case-insensitive
+        
+        if strategy_name not in cls._strategies:
+            raise ValueError(f"Unknown chunking strategy: {strategy_name}")
+        
+        strategy_class = cls._strategies[strategy_name]
+        return strategy_class(**kwargs)
+    
+    @classmethod
+    def get_available_strategies(cls) -> list:
+        """Get list of available chunking strategies."""
+        return list(cls._strategies.keys())
+
+
 class ChunkingStrategyFactory:
     """Factory for creating chunking strategy instances."""
 
@@ -267,19 +318,14 @@ class ChunkingStrategyFactory:
         
         Raises:
             ValueError: If the strategy_name is unknown, None, or empty.
+            
+        Note:
+            This method is maintained for backward compatibility.
+            New code should use ChunkingStrategyRegistry.create_strategy() instead.
         """
         if strategy_name is None:
             raise ValueError("Strategy name cannot be None")
         if not strategy_name or not strategy_name.strip():
             raise ValueError("Strategy name cannot be empty")
             
-        strategy_name = strategy_name.lower()  # Make case-insensitive
-        if strategy_name == "sentence_splitter":
-            return SentenceSplitterChunkingStrategy()
-        elif strategy_name == "word_overlap":
-            return WordOverlapChunkingStrategy()
-        # In the future, other strategies will be added here.
-        # elif strategy_name == "recursive_character":
-        #     return RecursiveCharacterChunkingStrategy()
-        else:
-            raise ValueError(f"Unknown chunking strategy: {strategy_name}")
+        return ChunkingStrategyRegistry.create_strategy(strategy_name)

@@ -414,6 +414,7 @@ class TestEmbeddingProviders:
         """Test OpenAIEmbeddingProvider.get_embedding method."""
         with patch.dict('os.environ', {'OPENAI_MODEL': 'text-embedding-3-small'}):
             provider = OpenAIEmbeddingProvider("test-api-key")
+            await provider.initialize()  # Initialize the client first
             
             # Mock the OpenAI client response
             mock_response = Mock()
@@ -440,7 +441,7 @@ class TestEmbeddingProviders:
 
     def test_embedding_provider_factory_unknown(self):
         """Test EmbeddingProviderFactory raises error for unknown provider."""
-        with pytest.raises(ValueError, match="Ukendt udbyder"):
+        with pytest.raises(ValueError, match="Unknown embedding provider"):
             EmbeddingProviderFactory.create_provider("unknown", "test-key")
 
 

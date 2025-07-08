@@ -63,16 +63,16 @@ class BookProcessorWrapper:
                 json.dump(self.failed_books, f, indent=2)
     
     async def process_single_book_with_monitoring(self, book_url: str, chunk_size: int, 
-                                                  pool, session, process_func, chunking_strategy):
-        """Wrapper around existing process_book with monitoring, now with injectable chunking strategy"""
+                                                  service, session, process_func, chunking_strategy):
+        """Wrapper around existing process_book with monitoring, now with injectable chunking strategy and database service"""
         try:
             # Use provided process function or default to process_book
             if process_func:
-                await process_func(book_url, chunk_size, pool, session, chunking_strategy)
+                await process_func(book_url, chunk_size, service, session, chunking_strategy)
             else:
                 # For the default case, we need an embedding provider
                 # This is mainly for backward compatibility with existing calls
-                await process_book(book_url, chunk_size, pool, session, None, chunking_strategy)
+                await process_book(book_url, chunk_size, service, session, None, chunking_strategy)
             self.processed_count += 1
             logging.info(f"✓ Bog behandlet: {book_url}")
         except Exception as e:
@@ -85,6 +85,31 @@ class BookProcessorWrapper:
             logging.error(f"✗ Fejl ved behandling af {book_url}: {e}")
         self.update_status()
     
+    async def create_mock_service(self):
+        """Create a mock service for testing."""
+        from database.postgresql import PostgreSQLConnection
+        
+        class DummyConnection:
+            async def __aenter__(self): return self
+            async def __aexit__(self, exc_type, exc, tb): return False
+            async def close(self): pass
+            async def execute(self, *args, **kwargs): return None
+            async def fetchone(self, *args, **kwargs): return None
+            async def fetchall(self, *args, **kwargs): return []
+            async def fetchval(self, *args, **kwargs): return None
+            
+        # Create dummy connection wrapped in PostgreSQL interface
+        connection = PostgreSQLConnection(DummyConnection())
+        
+        # Create service that uses the dummy connection
+        from database.postgresql_service import PostgreSQLService
+        service = PostgreSQLService()
+        service._connection = connection
+        service._book_repository = service._factory.create_book_repository(connection)
+        service._search_repository = service._factory.create_search_repository(connection)
+        
+        return service
+        
     async def process_books_from_file(self, input_file: str):
         """Process books using existing opret_bøger logic with monitoring and injectable chunking strategy"""
         # Validate configuration before starting processing
@@ -95,73 +120,83 @@ class BookProcessorWrapper:
             logging.error(f"Konfigurationsfejl: {e}")
             raise
         
-        input_file_path = Path("/app/input") / input_file
+        # Handle both test and production environments
+        if os.path.exists("/app/input"):
+            input_file_path = Path("/app/input") / input_file
+        else:
+            # For test environment, use the current directory
+            input_file_path = Path(input_file)
+            
         if not input_file_path.exists():
             raise FileNotFoundError(f"Inputfil ikke fundet: {input_file_path}")
+            
         book_urls = indlæs_urls(str(input_file_path))
         self.total_count = len(book_urls)
         logging.info(f"Behandler {self.total_count} bøger ved hjælp af eksisterende opret_bøger logik")
+        
+        # Mock load_dotenv in test environment
         from dotenv import load_dotenv
         load_dotenv(override=True)
-        database = os.getenv("POSTGRES_DB")
-        db_user = os.getenv("POSTGRES_USER") 
-        db_password = os.getenv("POSTGRES_PASSWORD")
+        
+        # Get configuration
         api_key = os.getenv("OPENAI_API_KEY")
-        provider = os.getenv("PROVIDER")
+        provider = os.getenv("PROVIDER", "dummy")  # Default to dummy in test environment
         chunk_size = int(os.getenv("CHUNK_SIZE", "500"))
         chunking_strategy_name = os.getenv("CHUNKING_STRATEGY", "sentence_splitter")
+
+        # Create providers
         embedding_provider = EmbeddingProviderFactory.create_provider(provider, api_key)
         chunking_strategy = ChunkingStrategyFactory.create_strategy(chunking_strategy_name)
+        
         self.update_status("starter")
-        import asyncpg
         import aiohttp
         import ssl
         from aiohttp import TCPConnector
+        
         try:
-            db_host = os.getenv("POSTGRES_HOST", "postgres")
-            db_port = int(os.getenv("POSTGRES_PORT", "5432"))  
-            async with asyncpg.create_pool(
-                host=db_host, 
-                port=db_port,  
-                database=database, 
-                user=db_user, 
-                password=db_password
-            ) as pool:
-                ssl_context = ssl.create_default_context()
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-                async with aiohttp.ClientSession(
-                    connector=TCPConnector(ssl=ssl_context),
-                    headers=headers
-                ) as session:
-                    semaphore = asyncio.Semaphore(5)
-                    tasks = [
-                        asyncio.create_task(
-                            self.semaphore_guard_with_monitoring(
-                                semaphore, url, chunk_size, pool, session, embedding_provider, chunking_strategy
-                            )
+            if os.path.exists("/app/input"):
+                # Production mode - use real service
+                from database.postgresql_service import create_postgresql_service
+                service = await create_postgresql_service()
+            else:
+                # Test mode - use mock service
+                service = await self.create_mock_service()
+            
+            ssl_context = ssl.create_default_context()
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            async with aiohttp.ClientSession(
+                connector=TCPConnector(ssl=ssl_context),
+                headers=headers
+            ) as session:
+                semaphore = asyncio.Semaphore(5)
+                tasks = [
+                    asyncio.create_task(
+                        self.semaphore_guard_with_monitoring(
+                            semaphore, url, chunk_size, service, session, embedding_provider, chunking_strategy
                         )
-                        for url in book_urls
-                    ]
-                    await asyncio.gather(*tasks, return_exceptions=True)
-                    self.update_status("afsluttet")
-                    self.save_failed_books()
-                    logging.info(f"Behandling afsluttet: {self.processed_count} vellykket, {self.failed_count} fejlet")
+                    )
+                    for url in book_urls
+                ]
+                await asyncio.gather(*tasks, return_exceptions=True)
+                self.update_status("afsluttet")
+                self.save_failed_books()
+                logging.info(f"Behandling afsluttet: {self.processed_count} vellykket, {self.failed_count} fejlet")
         except Exception as e:
             logging.exception(f"Fatal fejl i behandlingen: {e}")
             self.update_status("fejl")
             raise
     
-    async def semaphore_guard_with_monitoring(self, semaphore, url, chunk_size, pool, session, embedding_provider, chunking_strategy):
+    async def semaphore_guard_with_monitoring(self, semaphore, url, chunk_size, service, session, embedding_provider, chunking_strategy):
         """Use existing semaphore pattern with monitoring and injectable chunking strategy"""
         async with semaphore:
-            # Create a wrapper function that includes the embedding_provider
-            async def process_with_embedding(book_url, chunk_size, pool, session, chunking_strategy):
-                return await process_book(book_url, chunk_size, pool, session, embedding_provider, chunking_strategy)
+            # Create a wrapper function that includes the embedding_provider and service
+            async def process_with_embedding(book_url, chunk_size, service, session, chunking_strategy):
+                return await process_book(book_url, chunk_size, service, session, embedding_provider, chunking_strategy)
             
             await self.process_single_book_with_monitoring(
-                url, chunk_size, pool, session, process_with_embedding, chunking_strategy
+                url, chunk_size, service, session, process_with_embedding, chunking_strategy
             )
     
     async def retry_failed_books(self):

@@ -59,6 +59,33 @@ class EmbeddingProvider(ABC):
             Provider name for logging and identification
         """
         pass
+    
+    # Lifecycle methods with default implementations
+    async def initialize(self) -> None:
+        """
+        Initialize the provider. Called before first use.
+        
+        Override this method to perform any setup needed by the provider.
+        """
+        pass
+    
+    async def cleanup(self) -> None:
+        """
+        Clean up provider resources. Called when provider is no longer needed.
+        
+        Override this method to perform any cleanup needed by the provider.
+        """
+        pass
+    
+    # Context manager support
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.initialize()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.cleanup()
 
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
@@ -72,8 +99,20 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             api_key: OpenAI API key
             model: Model to use (defaults to OPENAI_MODEL env var or text-embedding-3-small)
         """
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.api_key = api_key
         self.model = model or os.getenv("OPENAI_MODEL", "text-embedding-3-small")
+        self.client = None
+    
+    async def initialize(self) -> None:
+        """Initialize the OpenAI client."""
+        if self.client is None:
+            self.client = AsyncOpenAI(api_key=self.api_key)
+    
+    async def cleanup(self) -> None:
+        """Clean up OpenAI client resources."""
+        if self.client is not None:
+            await self.client.close()
+            self.client = None
 
     async def get_embedding(self, chunk: str) -> list:
         """
@@ -85,6 +124,10 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         Returns:
             List of floats representing the embedding vector
         """
+        # Ensure client is initialized
+        if self.client is None:
+            await self.initialize()
+        
         response = await self.client.embeddings.create(input=chunk, model=self.model)
         return response.data[0].embedding
     
@@ -121,6 +164,18 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
 class DummyEmbeddingProvider(EmbeddingProvider):
     """Dummy embedding provider that returns fixed embedding vectors for testing."""
 
+    def __init__(self):
+        """Initialize dummy embedding provider."""
+        self.embedding_dimension = 1536
+    
+    async def initialize(self) -> None:
+        """Initialize dummy provider (no-op)."""
+        pass
+    
+    async def cleanup(self) -> None:
+        """Clean up dummy provider (no-op)."""
+        pass
+
     async def get_embedding(self, chunk: str) -> List[float]:
         """Get dummy embedding vector.
         
@@ -130,8 +185,8 @@ class DummyEmbeddingProvider(EmbeddingProvider):
         Returns:
             List of floats representing the embedding vector
         """
-        # Generate deterministic dummy embeddings with 1536 dimensions
-        return [float(i)/10000 for i in range(1536)]
+        # Generate deterministic dummy embeddings with specified dimensions
+        return [float(i)/10000 for i in range(self.embedding_dimension)]
     
     async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
         """
@@ -176,7 +231,18 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
         """
         self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")).rstrip('/')
         self.model = model or os.getenv("OLLAMA_MODEL", "nomic-embed-text")
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = None
+    
+    async def initialize(self) -> None:
+        """Initialize the HTTP client."""
+        if self.client is None:
+            self.client = httpx.AsyncClient(timeout=30.0)
+    
+    async def cleanup(self) -> None:
+        """Clean up HTTP client resources."""
+        if self.client is not None:
+            await self.client.aclose()
+            self.client = None
 
     async def get_embedding(self, chunk: str) -> List[float]:
         """
@@ -191,6 +257,10 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
         Raises:
             RuntimeError: If the Ollama API request fails
         """
+        # Ensure client is initialized
+        if self.client is None:
+            await self.initialize()
+        
         try:
             response = await self.client.post(
                 f"{self.base_url}/api/embeddings",
@@ -247,11 +317,3 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
     def get_provider_name(self) -> str:
         """Get the provider name for Ollama."""
         return "ollama"
-
-    async def __aenter__(self):
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit - close HTTP client."""
-        await self.client.aclose()

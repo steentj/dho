@@ -24,6 +24,7 @@ class TestOllamaEmbeddingBug:
             base_url="http://test-ollama:11434",
             model="test-model"
         )
+        await provider.initialize()  # Initialize the client first
         
         # Create a mock response that behaves like the problematic one
         mock_response = MagicMock()
@@ -52,6 +53,7 @@ class TestOllamaEmbeddingBug:
             base_url="http://test-ollama:11434", 
             model="test-model"
         )
+        await provider.initialize()  # Initialize the client first
         
         # Create a proper async mock response
         mock_response = AsyncMock()
@@ -76,6 +78,7 @@ class TestOllamaEmbeddingBug:
             base_url="http://test-ollama:11434",
             model="test-model"
         )
+        await provider.initialize()  # Initialize the client first
         
         # Create a mock response with non-awaitable json()
         mock_response = MagicMock()
