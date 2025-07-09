@@ -6,8 +6,11 @@ infrastructure while maintaining compatibility with existing application code.
 """
 
 import logging
+import os
+import asyncpg
 from typing import List, Tuple, Optional, Dict, Any
 from contextlib import asynccontextmanager
+from pgvector.asyncpg import register_vector
 
 from .factory import create_database_factory
 from .interfaces import DatabaseConnection, BookRepository, SearchRepository, DatabaseFactory
@@ -291,6 +294,162 @@ class BookService:
         return await self._service.create_book(pdf_url, title, author, pages)
 
 
+class PostgreSQLPoolService:
+    """
+    Connection pool-based PostgreSQL service for concurrent operations.
+    
+    This service uses asyncpg connection pools to handle multiple concurrent
+    database operations safely, solving the "another operation is in progress" error.
+    """
+    
+    def __init__(self, database_url: str = None):
+        """Initialize pool service with database URL."""
+        self._database_url = database_url or self._build_database_url()
+        self._pool = None
+        self._factory = create_database_factory("postgresql", database_url=self._database_url)
+    
+    def _build_database_url(self) -> str:
+        """Build database URL from environment variables."""
+        host = os.getenv("POSTGRES_HOST", "localhost")
+        port = os.getenv("POSTGRES_PORT", "5432")
+        database = os.getenv("POSTGRES_DB")
+        user = os.getenv("POSTGRES_USER")
+        password = os.getenv("POSTGRES_PASSWORD")
+        
+        if not all([database, user, password]):
+            # For testing, provide a default URL if environment variables are missing
+            if os.getenv("TESTING", "false").lower() == "true":
+                return "postgresql://test_user:test_password@localhost:5432/test_db"
+            raise ValueError("Missing required database environment variables")
+        
+        return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    
+    async def connect(self) -> None:
+        """Create connection pool."""
+        try:
+            self._pool = await asyncpg.create_pool(
+                self._database_url,
+                min_size=1,
+                max_size=10,  # Allow up to 10 concurrent connections
+                setup=self._setup_connection
+            )
+            logger.info("PostgreSQL pool service connected successfully")
+        except Exception as e:
+            logger.error(f"Failed to create PostgreSQL connection pool: {e}")
+            raise
+    
+    async def _setup_connection(self, connection):
+        """Setup individual connections in the pool."""
+        await register_vector(connection)
+    
+    async def disconnect(self) -> None:
+        """Close connection pool."""
+        try:
+            if self._pool:
+                await self._pool.close()
+                self._pool = None
+                logger.info("PostgreSQL pool service disconnected")
+        except Exception as e:
+            logger.error(f"Error disconnecting PostgreSQL pool service: {e}")
+            raise
+    
+    @asynccontextmanager
+    async def get_connection(self):
+        """Get a connection from the pool."""
+        if not self._pool:
+            raise RuntimeError("Pool service not connected")
+        
+        async with self._pool.acquire() as connection:
+            # Wrap the pooled connection using the factory
+            db_connection = self._factory.wrap_pooled_connection(connection)
+            yield db_connection
+    
+    @asynccontextmanager
+    async def get_book_repository(self):
+        """Get a book repository with a pooled connection."""
+        async with self.get_connection() as connection:
+            yield self._factory.create_book_repository(connection)
+    
+    @asynccontextmanager
+    async def get_search_repository(self):
+        """Get a search repository with a pooled connection."""
+        async with self.get_connection() as connection:
+            yield self._factory.create_search_repository(connection)
+    
+    # High-level convenience methods for common operations
+    async def find_book_by_url(self, pdf_url: str) -> Optional[int]:
+        """Find a book by its PDF URL and return the book ID if found."""
+        async with self.get_book_repository() as repo:
+            return await repo.find_book_by_url(pdf_url)
+    
+    async def create_book(self, pdf_url: str, title: str, author: str, pages: int) -> int:
+        """Create a new book and return its ID."""
+        async with self.get_book_repository() as repo:
+            return await repo.create_book(pdf_url, title, author, pages)
+    
+    async def save_chunks(self, book_id: int, chunks_with_embeddings: List[Tuple[int, str, List[float]]], table_name: str = "chunks") -> None:
+        """Save chunks and their embeddings for a book."""
+        async with self.get_book_repository() as repo:
+            return await repo.save_chunks(book_id, chunks_with_embeddings, table_name)
+    
+    async def save_book(self, book_data: dict, table_name: str = "chunks") -> None:
+        """High-level save_book method for compatibility with existing save_book function."""
+        # Extract book metadata
+        pdf_url = book_data.get("pdf-url") or book_data.get("pdf_url") or book_data.get("url")
+        title = book_data.get("titel") or book_data.get("title", "")
+        author = book_data.get("forfatter") or book_data.get("author", "")
+        pages = book_data.get("antal_sider") or book_data.get("pages", 0)
+        chunks = book_data.get("chunks", [])
+        
+        if not pdf_url:
+            raise ValueError("Missing PDF URL in book data")
+        
+        # Find or create book
+        book_id = await self.find_book_by_url(pdf_url)
+        if book_id is None:
+            book_id = await self.create_book(pdf_url, title, author, pages)
+        
+        # Save chunks
+        chunks_with_embeddings = []
+        for chunk_data in chunks:
+            page_num = chunk_data.get("sidenr", 1)
+            chunk_text = chunk_data.get("chunk", "")
+            embedding = chunk_data.get("embedding", [])
+            chunks_with_embeddings.append((page_num, chunk_text, embedding))
+        
+        if chunks_with_embeddings:
+            await self.save_chunks(book_id, chunks_with_embeddings, table_name)
+    
+    async def vector_search(
+        self, 
+        embedding: List[float], 
+        limit: int = 10, 
+        distance_function: str = "cosine",
+        chunk_size: str = "normal"
+    ) -> List[Tuple]:
+        """Perform vector similarity search."""
+        async with self.get_search_repository() as repo:
+            return await repo.vector_search(embedding, limit, distance_function, chunk_size)
+    
+    # Compatibility method for embedding providers
+    async def execute_query(self, query: str, params: List = None) -> List[Dict]:
+        """Execute a query and return results as list of dicts for embedding provider compatibility."""
+        async with self.get_connection() as connection:
+            if params is None:
+                params = []
+            rows = await connection.fetchall(query, *params)
+            
+            # Convert asyncpg.Record objects to dictionaries
+            if rows:
+                # Get column names from the first row
+                if hasattr(rows[0], 'keys'):
+                    return [dict(row) for row in rows]
+                else:
+                    # If it's a simple query result, wrap in dict format
+                    return [{'count': rows[0]}] if len(rows) == 1 and len(rows[0]) == 1 else []
+            return []
+
+
 # Convenience functions for easy integration
 async def create_postgresql_service(database_url: str = None) -> PostgreSQLService:
     """
@@ -303,6 +462,21 @@ async def create_postgresql_service(database_url: str = None) -> PostgreSQLServi
         Connected PostgreSQLService instance
     """
     service = PostgreSQLService(database_url)
+    await service.connect()
+    return service
+
+
+async def create_postgresql_pool_service(database_url: str = None) -> PostgreSQLPoolService:
+    """
+    Create and connect a PostgreSQL pool service for concurrent operations.
+    
+    Args:
+        database_url: Optional database URL override
+        
+    Returns:
+        Connected PostgreSQLPoolService instance
+    """
+    service = PostgreSQLPoolService(database_url)
     await service.connect()
     return service
 

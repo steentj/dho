@@ -155,9 +155,9 @@ class BookProcessorWrapper:
         
         try:
             if os.path.exists("/app/input"):
-                # Production mode - use real service
-                from database.postgresql_service import create_postgresql_service
-                service = await create_postgresql_service()
+                # Production mode - use pool service for concurrent operations
+                from database.postgresql_service import create_postgresql_pool_service
+                service = await create_postgresql_pool_service()
             else:
                 # Test mode - use mock service
                 service = await self.create_mock_service()

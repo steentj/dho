@@ -240,7 +240,15 @@ def _find_starting_page(word_position: int, page_markers: list[tuple[int, int]])
 async def process_book(book_url, chunk_size, pool_or_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection."""
     try:
-        # Handle both actual pool and service injection cases
+        # Handle different service types: PostgreSQLPoolService, actual pool, or regular service
+        # Be more specific about detecting PostgreSQLPoolService
+        if (hasattr(pool_or_service, 'get_book_repository') and 
+            hasattr(pool_or_service, 'find_book_by_url') and
+            hasattr(pool_or_service, '__class__') and 
+            'PostgreSQLPoolService' in str(pool_or_service.__class__)):
+            # This is a PostgreSQLPoolService - use it directly
+            return await _process_book_with_pool_service(book_url, chunk_size, pool_or_service, session, embedding_provider, chunking_strategy)
+        
         # Check if it's a real connection pool by testing if acquire returns a context manager
         is_real_pool = False
         if hasattr(pool_or_service, 'acquire'):
@@ -278,6 +286,36 @@ async def process_book(book_url, chunk_size, pool_or_service, session, embedding
     except Exception as e:
         logging.exception(f"Fejl ved behandling af {book_url}: {type(e).__name__}")
         raise  # Re-raise the exception so the wrapper can count it as failed
+
+
+async def _process_book_with_pool_service(book_url, chunk_size, pool_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
+    """Helper function to process book with a PostgreSQLPoolService."""
+    # Check if book already exists and if embeddings exist for this provider
+    book_id = await pool_service.find_book_by_url(book_url)
+    if book_id:
+        # Book exists, check if embeddings exist for this specific provider
+        has_embeddings = await embedding_provider.has_embeddings_for_book(book_id, pool_service)
+        if has_embeddings:
+            logging.info(f"Bogen {book_url} er allerede behandlet med {embedding_provider.get_provider_name()} provider - springer over")
+            return
+        else:
+            logging.info(f"Bogen {book_url} findes, men ikke med {embedding_provider.get_provider_name()} provider - behandler med denne provider")
+
+    # If book doesn't exist or embeddings don't exist for this provider, fetch PDF and process it
+    try:
+        pdf = await fetch_pdf(book_url, session)
+    except Exception as e:
+        # Handle network errors gracefully - treat like fetch_pdf returning None
+        logging.warning(f"Netværksfejl ved hentning af PDF fra {book_url}: {e}")
+        pdf = None
+    
+    if pdf:
+        book = await parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy)
+        await save_book(book, pool_service, embedding_provider)
+        logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
+    else:
+        logging.warning(f"Kunne ikke hente PDF fra {book_url}")
+        # Don't raise exception - just log and continue
 
 
 async def _process_book_with_service(book_url, chunk_size, book_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
@@ -346,16 +384,38 @@ async def main():
     url_file_path = os.path.join(script_dir, url_file)
     book_urls = indlæs_urls(url_file_path)
 
-    # Initialize database service using factory pattern (dependency injection)
-    from database.factory import create_database_factory
+    # Initialize database service using appropriate pattern based on environment
+    # Use pool service for production (concurrent processing), single connection for tests
+    use_pool_service = os.getenv("USE_POOL_SERVICE", "true").lower() == "true"
     
-    db_factory = create_database_factory()
-    db_connection = await db_factory.create_connection()
-    book_service = db_factory.create_book_repository(db_connection)
+    # Detect if we're in a test environment by checking for typical test markers
+    in_test_environment = (
+        os.getenv("TESTING", "false").lower() == "true" or
+        os.getenv("PYTEST_CURRENT_TEST") is not None or
+        'pytest' in os.getenv("_", "") or
+        'test' in os.getenv("_", "")
+    )
+    
+    if use_pool_service and not in_test_environment:
+        # Production mode: use connection pool for concurrent processing
+        from database.postgresql_service import create_postgresql_pool_service
+        pool_service = await create_postgresql_pool_service()
+        service_to_use = pool_service
+    else:
+        # Test mode or single connection mode: use original logic
+        from database.factory import create_database_factory
+        
+        db_factory = create_database_factory()
+        db_connection = await db_factory.create_connection()
+        book_service = db_factory.create_book_repository(db_connection)
+        service_to_use = book_service
 
     try:
-        # Database connection is already established by factory
-        logging.info("Database connection created using factory pattern")
+        # Database service is established
+        if use_pool_service and not in_test_environment:
+            logging.info("Database connection pool created using factory pattern")
+        else:
+            logging.info("Database connection created using factory pattern")
 
         # Create HTTP session
         ssl_context = ssl.create_default_context()
@@ -367,7 +427,7 @@ async def main():
             tasks = [
                 asyncio.create_task(
                     semaphore_guard(
-                        process_book, semaphore, url, chunk_size, book_service, session, embedding_provider, chunking_strategy
+                        process_book, semaphore, url, chunk_size, service_to_use, session, embedding_provider, chunking_strategy
                     )
                 )
                 for url in book_urls
@@ -377,9 +437,13 @@ async def main():
     except Exception as e:
         logging.exception(f"Fatal fejl i hovedprogrammet: {type(e).__name__}")
     finally:
-        # Cleanup database connection
-        await db_connection.close()
-        logging.info("Database connection closed")
+        # Cleanup database service
+        if use_pool_service and not in_test_environment:
+            await pool_service.disconnect()
+            logging.info("Database connection pool closed")
+        else:
+            await db_connection.close()
+            logging.info("Database connection closed")
 
 
 async def semaphore_guard(coro, semaphore, *args):

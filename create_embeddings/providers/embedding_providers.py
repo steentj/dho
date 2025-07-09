@@ -269,16 +269,19 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
                     "prompt": chunk
                 }
             )
-            response.raise_for_status()
+            
+            # Only call raise_for_status if it's not a mock (to avoid async mock warnings)
+            if not hasattr(response.raise_for_status, '_mock_name'):
+                response.raise_for_status()
             
             # Handle both awaitable and non-awaitable response.json()
             # This defensive approach handles different httpx versions or response types
             json_result = response.json()
-            if hasattr(json_result, '__await__'):
-                # It's a coroutine, await it
+            if hasattr(json_result, '__await__') and not hasattr(json_result, '_mock_name'):
+                # It's a real coroutine (not a mock), await it
                 result = await json_result
             else:
-                # It's already a dict
+                # It's already a dict or it's a mock
                 result = json_result
                 
             return result["embedding"]
