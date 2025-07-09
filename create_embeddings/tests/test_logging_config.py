@@ -73,9 +73,11 @@ def test_setup_logging_suppresses_external_loggers(temp_log_dir):
     # Verify external loggers are set to WARNING
     openai_logger = logging.getLogger("openai")
     aiohttp_logger = logging.getLogger("aiohttp")
+    httpx_logger = logging.getLogger("httpx")
     
     assert openai_logger.level == logging.WARNING
     assert aiohttp_logger.level == logging.WARNING
+    assert httpx_logger.level == logging.WARNING
 
 def test_get_log_directory_with_env_var(clean_env):
     """Test get_log_directory with LOG_DIR environment variable."""

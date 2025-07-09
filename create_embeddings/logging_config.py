@@ -44,6 +44,7 @@ def setup_logging(log_dir: str = None, log_level: int = logging.INFO) -> Path:
     # Suppress verbose logs from external libraries
     logging.getLogger("openai").setLevel(logging.WARNING)
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     
     logging.info(f"Logging configured. Log file: {log_file}")
     return log_file
