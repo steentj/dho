@@ -1,5 +1,37 @@
 # DHO Semantic Search System - AI Coding Agent Guide
 
+## 🔒 MANDATORY DEVELOPMENT PRINCIPLES - CAST IN STONE
+
+### **TINY STEP DEVELOPMENT - NON-NEGOTIABLE**
+- **ALWAYS develop in tiny steps**
+- **Each tiny step MUST include writing or updating tests** for new and changed code
+- **STOP after each tiny step and WAIT for manual confirmation** before continuing
+- **ALL tests in ALL areas of the codebase MUST pass** after each tiny step
+
+### **TWO MAJOR FUNCTIONAL AREAS**
+1. **Batch Program (Book Processing)**
+   - Reads books from the internet
+   - Chunks the text content
+   - Creates embeddings for chunks
+   - Saves processed books with chunks and embeddings to database
+
+2. **Transactional Search Program**
+   - Takes user text input
+   - Creates embedding for the input text
+   - Searches database for similar text chunks
+   - Returns relevant results
+
+### **THREE SHARED PROVIDERS - CRITICAL DEPENDENCY**
+When changing ANY of these providers, ensure NO side effects in either book processing OR search functionality:
+1. **Embedding Provider** - handles text-to-vector conversion
+2. **Chunking Strategy** - handles text segmentation
+3. **Database Operations** - handles data persistence
+
+### **API TEST GUI - LOCAL TESTING ONLY**
+- `api_test_gui/` is meant SOLELY for local testing of search functionality
+- Ensure side effects from changes in other code (mainly search) are corrected in the GUI
+- Keep GUI synchronized with search API changes
+
 ## Architecture Overview
 
 A semantic search system for Danish historical PDFs using dependency injection patterns throughout:
@@ -66,16 +98,39 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 
 ## Development Workflow
 
-### Phase-Based Development
+### **MANDATORY: Tiny Step Development Process**
 1. **Plan First**: Create development phases with clear goals
-2. **Tiny Steps**: Develop each phase in small, testable increments  
+2. **Tiny Steps**: Develop each phase in small, testable increments
+   - **NEVER proceed without writing/updating tests**
+   - **NEVER skip test execution**
+   - **NEVER continue without manual confirmation**
 3. **Test-Driven**: Create/update tests for each step
-4. **Manual Confirmation**: Always ask for confirmation before proceeding
-5. **Documentation**: 
+4. **Full Test Validation**: ALL tests across ALL areas must pass
+5. **Manual Confirmation**: Always ask for confirmation before proceeding
+6. **Cross-Area Impact Check**: Verify no side effects in:
+   - Book processing functionality
+   - Search functionality  
+   - API test GUI functionality
+7. **Documentation**: 
     1. Create/update markdown plans with to-do's for each phase
     2. All user docs in `/documentation/` must be Danish, technical, and concise
     3. Documentation is stored as markdown files in `/documentation/` directory
     4. Documents must have Creation date/time and Last Modified date/time at the top of the file
+
+### **Provider Change Protocol**
+When modifying any shared provider (embedding, chunking, database):
+1. **Impact Analysis**: Identify all affected areas
+2. **Test Both Areas**: Verify book processing AND search functionality
+3. **GUI Synchronization**: Update API test GUI if search changes
+4. **Full Regression**: Run complete test suite
+5. **Manual Verification**: Test actual functionality in both areas
+
+### **CRITICAL TEST COMPLETION RULES**
+- **MANDATORY FULL SUITE VALIDATION**: Always run all tests in the codebase and verify they are ALL passing before declaring any feature finished or problem solved
+- **PATIENCE WITH TEST EXECUTION**: When running all or a large number of tests, wait at least 15-20 seconds for complete execution - never assume tests are done prematurely
+- **NO PARTIAL COMPLETION CLAIMS**: Do not declare success based on partial test runs or individual test file results
+- **FULL VALIDATION COMMAND**: Always use `python -m pytest` (no file restrictions) as final validation step
+- **CROSS-AREA VERIFICATION**: Ensure tests pass in book processing, search, database, and GUI areas
 
 ### Test Quality Standards
 - **No Overlaps**: Avoid testing same functionality in multiple places
@@ -83,12 +138,6 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 - **No Linting Errors**: All code must pass linting before proceeding
 - **Test Structure**: Well-organized test suites with clear separation
 - **Test complies to code**: Do not change production code solely to fit tests or accomodate test tools or functions, always adapt tests to match the code
-
-### Critical Test Completion Rules
-- **MANDATORY FULL SUITE VALIDATION**: Always run all tests in the codebase and verify they are ALL passing before declaring any feature finished or problem solved
-- **PATIENCE WITH TEST EXECUTION**: When running all or a large number of tests, wait at least 15-20 seconds for complete execution - never assume tests are done prematurely
-- **NO PARTIAL COMPLETION CLAIMS**: Do not declare success based on partial test runs or individual test file results
-- **FULL VALIDATION COMMAND**: Always use `python -m pytest` (no file restrictions) as final validation step
 
 ### Testing Infrastructure
 
