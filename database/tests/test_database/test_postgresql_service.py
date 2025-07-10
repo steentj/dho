@@ -207,7 +207,7 @@ class TestPostgreSQLService:
         mock_search_repo.vector_search.return_value = [("result1",), ("result2",)]
         result = await service.vector_search(embedding, limit=5)
         assert result == [("result1",), ("result2",)]
-        mock_search_repo.vector_search.assert_called_once_with(embedding, 5, "cosine", "normal")
+        mock_search_repo.vector_search.assert_called_once_with(embedding, 5, "cosine", "normal", None)
     
     @patch.dict('os.environ', {'TESTING': 'true'})
     def test_ensure_connected_when_not_connected(self):

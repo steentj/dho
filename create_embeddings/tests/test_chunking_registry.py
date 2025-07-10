@@ -143,6 +143,7 @@ class TestChunkingRegistryBackwardCompatibility:
         assert isinstance(factory_strategy, type(registry_strategy))
         assert isinstance(factory_strategy, SentenceSplitterChunkingStrategy)
     
+    @patch.dict('os.environ', {}, clear=True)
     def test_factory_error_consistency(self):
         """Test that factory and registry produce consistent errors."""
         # Both should raise the same error for unknown strategies

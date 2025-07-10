@@ -237,13 +237,20 @@ async def find_nærmeste(vektor: list) -> list:
         # Get distance threshold from environment variable
         distance_threshold = float(os.getenv("DISTANCE_THRESHOLD", "0.5"))
         
-        # Use our dependency injection service for vector search
+        # Get the provider name from the global embedding provider
+        # This ensures search uses the same provider's table as the query embedding
+        provider_name = None
+        if embedding_provider and hasattr(embedding_provider, 'get_provider_name'):
+            provider_name = embedding_provider.get_provider_name()
+        
+        # Use our dependency injection service for vector search with provider-aware table selection
         # Get more results than needed so we can filter by distance threshold
         results = await db_service.vector_search(
             embedding=vektor,
             limit=1000,  # Get more results to allow for filtering
             distance_function="cosine",  # corresponds to <=> operator
-            chunk_size="normal"  # corresponds to "chunks" table
+            chunk_size="normal",  # Legacy parameter for backward compatibility
+            provider_name=provider_name  # NEW: Provider-aware table selection
         )
         
         # Filter results by distance threshold and minimum chunk length

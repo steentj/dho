@@ -129,17 +129,40 @@ class PostgreSQLSearchRepository(SearchRepository):
         embedding: List[float], 
         limit: int = 10, 
         distance_function: str = "cosine",
-        chunk_size: str = "normal"
+        chunk_size: str = "normal",
+        provider_name: str = None
     ) -> List[Tuple]:
-        """Perform vector similarity search."""
-        # Map chunk size to table name
-        table_map = {
-            "normal": "chunks",
-            "large": "chunks_large", 
-            "small": "chunks_small",
-            "tiny": "chunks_tiny"
-        }
-        table = table_map.get(chunk_size, "chunks")
+        """Perform vector similarity search with provider-aware table selection.
+        
+        Args:
+            embedding: The query embedding vector
+            limit: Maximum number of results to return
+            distance_function: Distance function to use ("cosine", "l2", "inner_product", "l1")
+            chunk_size: Chunk size category ("normal", "large", "small", "tiny")
+            provider_name: Name of embedding provider to determine table selection
+                          (None = use chunk_size mapping, "openai" = chunks, "ollama" = chunks_nomic)
+        
+        Returns:
+            List of tuples containing search results
+        """
+        # Determine table name based on provider or chunk size
+        if provider_name:
+            # Provider-aware table selection (NEW FEATURE)
+            provider_table_map = {
+                "openai": "chunks",      # 1536-dimensional OpenAI embeddings
+                "dummy": "chunks",       # Dummy provider uses same table as OpenAI 
+                "ollama": "chunks_nomic" # 768-dimensional Ollama embeddings
+            }
+            table = provider_table_map.get(provider_name, "chunks")
+        else:
+            # Legacy chunk size mapping (BACKWARD COMPATIBILITY)
+            table_map = {
+                "normal": "chunks",
+                "large": "chunks_large", 
+                "small": "chunks_small",
+                "tiny": "chunks_tiny"
+            }
+            table = table_map.get(chunk_size, "chunks")
         
         # Map distance function to operator
         operator_map = {

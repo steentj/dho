@@ -134,12 +134,13 @@ class PostgreSQLService:
         embedding: List[float], 
         limit: int = 10, 
         distance_function: str = "cosine",
-        chunk_size: str = "normal"
+        chunk_size: str = "normal",
+        provider_name: str = None
     ) -> List[Tuple]:
-        """Perform vector similarity search."""
+        """Perform vector similarity search with provider-aware table selection."""
         self._ensure_connected()
         return await self._search_repository.vector_search(
-            embedding, limit, distance_function, chunk_size
+            embedding, limit, distance_function, chunk_size, provider_name
         )
     
     # Legacy compatibility methods for existing dhosearch.py
@@ -425,11 +426,12 @@ class PostgreSQLPoolService:
         embedding: List[float], 
         limit: int = 10, 
         distance_function: str = "cosine",
-        chunk_size: str = "normal"
+        chunk_size: str = "normal",
+        provider_name: str = None
     ) -> List[Tuple]:
-        """Perform vector similarity search."""
+        """Perform vector similarity search with provider-aware table selection."""
         async with self.get_search_repository() as repo:
-            return await repo.vector_search(embedding, limit, distance_function, chunk_size)
+            return await repo.vector_search(embedding, limit, distance_function, chunk_size, provider_name)
     
     # Compatibility method for embedding providers
     async def execute_query(self, query: str, params: List = None) -> List[Dict]:
