@@ -2,9 +2,10 @@ FROM python:3.13-slim
 
 WORKDIR /code
 
-COPY ./requirements.txt ./requirements.txt
+COPY soegemaskine/searchapi/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
-COPY ./ /code/searchapi
+# Copy the entire src directory to maintain module imports
+COPY ./ /code/
 
-CMD ["uvicorn", "searchapi.dhosearch:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "soegemaskine.searchapi.dhosearch:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

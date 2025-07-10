@@ -1,4 +1,5 @@
 psycopg[binary,pool]
+asyncpg
 pgvector
 python_dotenv
 openai

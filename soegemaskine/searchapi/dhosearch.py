@@ -57,7 +57,12 @@ async def lifespan(app: FastAPI):
     # Initialize embedding provider with dependency injection
     provider_name = os.getenv("PROVIDER", "openai")
     api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("OPENAI_MODEL", "text-embedding-3-small")
+    
+    # Use the appropriate model based on the provider
+    if provider_name == "ollama":
+        model = os.getenv("OLLAMA_MODEL", "nomic-embed-text")
+    else:
+        model = os.getenv("OPENAI_MODEL", "text-embedding-3-small")
     
     embedding_provider = EmbeddingProviderFactory.create_provider(
         provider_name=provider_name, 
