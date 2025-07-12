@@ -21,6 +21,7 @@ __pycache__/
 
 # Ignore WW2 backup
 WW2*.SQL
+nomic_export*.sql
 
 # Ignore python environment files
 dho/
