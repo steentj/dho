@@ -189,30 +189,12 @@ async def main():
     url_file_path = os.path.join(script_dir, url_file)
     book_urls = indlæs_urls(url_file_path)
 
-    # Initialize database service using environment configuration
-    # Use pool service or single connection based on USE_POOL_SERVICE setting
-    use_pool_service = os.getenv("USE_POOL_SERVICE", "true").lower() == "true"
-    
-    if use_pool_service:
-        # Use connection pool for concurrent processing
-        from database.postgresql_service import create_postgresql_pool_service
-        pool_service = await create_postgresql_pool_service()
-        service_to_use = pool_service
-    else:
-        # Use single connection mode
-        from database.factory import create_database_factory
-        
-        db_factory = create_database_factory()
-        db_connection = await db_factory.create_connection()
-        book_service = db_factory.create_book_repository(db_connection)
-        service_to_use = book_service
+    # Initialize database service using pool service (preferred for concurrent processing)
+    from database.postgresql_service import create_postgresql_pool_service
+    book_service = await create_postgresql_pool_service()
 
     try:
-        # Database service is established
-        if use_pool_service:
-            logging.info("Database connection pool created using factory pattern")
-        else:
-            logging.info("Database connection created using factory pattern")
+        logging.info("Database connection pool created using factory pattern")
 
         # Create HTTP session
         ssl_context = ssl.create_default_context()
@@ -224,7 +206,7 @@ async def main():
             tasks = [
                 asyncio.create_task(
                     semaphore_guard(
-                        process_book, semaphore, url, chunk_size, service_to_use, session, embedding_provider, chunking_strategy
+                        process_book, semaphore, url, chunk_size, book_service, session, embedding_provider, chunking_strategy
                     )
                 )
                 for url in book_urls
@@ -235,12 +217,8 @@ async def main():
         logging.exception(f"Fatal fejl i hovedprogrammet: {type(e).__name__}")
     finally:
         # Cleanup database service
-        if use_pool_service:
-            await pool_service.disconnect()
-            logging.info("Database connection pool closed")
-        else:
-            await db_connection.close()
-            logging.info("Database connection closed")
+        await book_service.disconnect()
+        logging.info("Database connection pool closed")
 
 
 async def semaphore_guard(coro, semaphore, *args):
