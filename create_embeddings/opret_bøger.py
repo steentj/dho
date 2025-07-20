@@ -189,25 +189,17 @@ async def main():
     url_file_path = os.path.join(script_dir, url_file)
     book_urls = indlæs_urls(url_file_path)
 
-    # Initialize database service using appropriate pattern based on environment
-    # Use pool service for production (concurrent processing), single connection for tests
+    # Initialize database service using environment configuration
+    # Use pool service or single connection based on USE_POOL_SERVICE setting
     use_pool_service = os.getenv("USE_POOL_SERVICE", "true").lower() == "true"
     
-    # Detect if we're in a test environment by checking for typical test markers
-    in_test_environment = (
-        os.getenv("TESTING", "false").lower() == "true" or
-        os.getenv("PYTEST_CURRENT_TEST") is not None or
-        'pytest' in os.getenv("_", "") or
-        'test' in os.getenv("_", "")
-    )
-    
-    if use_pool_service and not in_test_environment:
-        # Production mode: use connection pool for concurrent processing
+    if use_pool_service:
+        # Use connection pool for concurrent processing
         from database.postgresql_service import create_postgresql_pool_service
         pool_service = await create_postgresql_pool_service()
         service_to_use = pool_service
     else:
-        # Test mode or single connection mode: use original logic
+        # Use single connection mode
         from database.factory import create_database_factory
         
         db_factory = create_database_factory()
@@ -217,7 +209,7 @@ async def main():
 
     try:
         # Database service is established
-        if use_pool_service and not in_test_environment:
+        if use_pool_service:
             logging.info("Database connection pool created using factory pattern")
         else:
             logging.info("Database connection created using factory pattern")
@@ -243,7 +235,7 @@ async def main():
         logging.exception(f"Fatal fejl i hovedprogrammet: {type(e).__name__}")
     finally:
         # Cleanup database service
-        if use_pool_service and not in_test_environment:
+        if use_pool_service:
             await pool_service.disconnect()
             logging.info("Database connection pool closed")
         else:
