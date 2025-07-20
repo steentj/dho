@@ -5,8 +5,44 @@ This test validates that the fix prevents the "expected str, got list" error.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from create_embeddings.opret_bøger import _save_book_with_repository
+from create_embeddings.opret_bøger import save_book
+from create_embeddings.book_service_interface import IBookService
+
+
+class MockBookService(IBookService):
+    """Mock BookService for testing defensive fix"""
+    
+    def __init__(self):
+        self.saved_books = []
+        self.saved_chunks = []
+    
+    async def save_book_with_chunks(self, book, table_name: str) -> int:
+        """Mock save_book_with_chunks that captures the data for inspection"""
+        self.saved_books.append(book)
+        
+        # Extract chunks to verify data types
+        for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+            self.saved_chunks.append({
+                "page_num": page_num,
+                "chunk_text": chunk_text,
+                "chunk_text_type": type(chunk_text),
+                "embedding": embedding
+            })
+        
+        return 123  # Mock book ID
+    
+    async def book_exists_with_provider(self, pdf_url: str, provider_name: str) -> bool:
+        return False  # For test purposes, assume book doesn't exist
+
+
+class MockEmbeddingProvider:
+    """Mock embedding provider for testing"""
+    
+    def get_table_name(self):
+        return "chunks_test"
+    
+    def get_provider_name(self):
+        return "test_provider"
 
 
 class TestDefensiveFix:
@@ -15,18 +51,15 @@ class TestDefensiveFix:
     @pytest.fixture
     def mock_service(self):
         """Create a mock book service for testing."""
-        service = MagicMock()
-        service.get_or_create_book = AsyncMock(return_value=123)
-        service.save_chunks = AsyncMock()
-        
-        # Mock the _service attribute (for line 125 in _save_book_with_repository)
-        service._service = MagicMock()
-        service._service.save_chunks = AsyncMock()
-        
-        return service
+        return MockBookService()
+
+    @pytest.fixture
+    def mock_embedding_provider(self):
+        """Create a mock embedding provider for testing."""
+        return MockEmbeddingProvider()
 
     @pytest.mark.asyncio
-    async def test_normal_string_chunk_text(self, mock_service):
+    async def test_normal_string_chunk_text(self, mock_service, mock_embedding_provider):
         """Test that normal string chunk_text works as expected."""
         book = {
             "pdf-url": "test-url",
@@ -37,22 +70,16 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await _save_book_with_repository(book, mock_service, "chunks_nomic")
+        await save_book(book, mock_service, mock_embedding_provider)
         
-        # Verify the service was called correctly
-        mock_service.get_or_create_book.assert_called_once()
-        mock_service._service.save_chunks.assert_called_once()
-        
-        # Check that chunk_text is passed as string
-        call_args = mock_service._service.save_chunks.call_args
-        chunks_with_embeddings = call_args[0][1]  # Second argument
-        assert len(chunks_with_embeddings) == 1
-        page_num, chunk_text, embedding = chunks_with_embeddings[0]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == "Normal string chunk"
+        # Verify the chunk text is passed as string
+        assert len(mock_service.saved_chunks) == 1
+        chunk = mock_service.saved_chunks[0]
+        assert isinstance(chunk["chunk_text"], str)
+        assert chunk["chunk_text"] == "Normal string chunk"
 
     @pytest.mark.asyncio
-    async def test_list_chunk_text_defensive_fix(self, mock_service):
+    async def test_list_chunk_text_defensive_fix(self, mock_service, mock_embedding_provider):
         """Test that list chunk_text is converted to string (defensive fix)."""
         book = {
             "pdf-url": "test-url-2",
@@ -63,21 +90,16 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await _save_book_with_repository(book, mock_service, "chunks_nomic")
-        
-        # Verify the service was called
-        mock_service._service.save_chunks.assert_called_once()
+        await save_book(book, mock_service, mock_embedding_provider)
         
         # Check that list chunk_text was converted to string
-        call_args = mock_service._service.save_chunks.call_args
-        chunks_with_embeddings = call_args[0][1]
-        assert len(chunks_with_embeddings) == 1
-        page_num, chunk_text, embedding = chunks_with_embeddings[0]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == "This is a list"  # List should be joined with spaces
+        assert len(mock_service.saved_chunks) == 1
+        chunk = mock_service.saved_chunks[0]
+        assert isinstance(chunk["chunk_text"], str)
+        assert chunk["chunk_text"] == "This is a list"  # List should be joined with spaces
 
     @pytest.mark.asyncio
-    async def test_integer_chunk_text_defensive_fix(self, mock_service):
+    async def test_integer_chunk_text_defensive_fix(self, mock_service, mock_embedding_provider):
         """Test that integer chunk_text is converted to string."""
         book = {
             "pdf-url": "test-url-3",
@@ -88,21 +110,16 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await _save_book_with_repository(book, mock_service, "chunks_nomic")
-        
-        # Verify the service was called
-        mock_service._service.save_chunks.assert_called_once()
+        await save_book(book, mock_service, mock_embedding_provider)
         
         # Check that integer chunk_text was converted to string
-        call_args = mock_service._service.save_chunks.call_args
-        chunks_with_embeddings = call_args[0][1]
-        assert len(chunks_with_embeddings) == 1
-        page_num, chunk_text, embedding = chunks_with_embeddings[0]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == "12345"
+        assert len(mock_service.saved_chunks) == 1
+        chunk = mock_service.saved_chunks[0]
+        assert isinstance(chunk["chunk_text"], str)
+        assert chunk["chunk_text"] == "12345"
 
     @pytest.mark.asyncio
-    async def test_empty_list_chunk_text(self, mock_service):
+    async def test_empty_list_chunk_text(self, mock_service, mock_embedding_provider):
         """Test that empty list chunk_text is handled gracefully."""
         book = {
             "pdf-url": "test-url-4",
@@ -113,21 +130,16 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await _save_book_with_repository(book, mock_service, "chunks_nomic")
-        
-        # Verify the service was called
-        mock_service._service.save_chunks.assert_called_once()
+        await save_book(book, mock_service, mock_embedding_provider)
         
         # Check that empty list becomes empty string
-        call_args = mock_service._service.save_chunks.call_args
-        chunks_with_embeddings = call_args[0][1]
-        assert len(chunks_with_embeddings) == 1
-        page_num, chunk_text, embedding = chunks_with_embeddings[0]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == ""  # Empty list joins to empty string
+        assert len(mock_service.saved_chunks) == 1
+        chunk = mock_service.saved_chunks[0]
+        assert isinstance(chunk["chunk_text"], str)
+        assert chunk["chunk_text"] == ""  # Empty list joins to empty string
 
     @pytest.mark.asyncio
-    async def test_multiple_chunks_mixed_types(self, mock_service):
+    async def test_multiple_chunks_mixed_types(self, mock_service, mock_embedding_provider):
         """Test multiple chunks with mixed data types."""
         book = {
             "pdf-url": "test-url-5",
@@ -142,30 +154,25 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768, [0.2] * 768, [0.3] * 768]
         }
         
-        await _save_book_with_repository(book, mock_service, "chunks_nomic")
-        
-        # Verify the service was called
-        mock_service._service.save_chunks.assert_called_once()
+        await save_book(book, mock_service, mock_embedding_provider)
         
         # Check all chunks are properly converted
-        call_args = mock_service._service.save_chunks.call_args
-        chunks_with_embeddings = call_args[0][1]
-        assert len(chunks_with_embeddings) == 3
+        assert len(mock_service.saved_chunks) == 3
         
         # Check first chunk (normal string)
-        page_num, chunk_text, embedding = chunks_with_embeddings[0]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == "Normal string"
+        chunk1 = mock_service.saved_chunks[0]
+        assert isinstance(chunk1["chunk_text"], str)
+        assert chunk1["chunk_text"] == "Normal string"
         
         # Check second chunk (was list, should be converted)
-        page_num, chunk_text, embedding = chunks_with_embeddings[1]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == "List of words"
+        chunk2 = mock_service.saved_chunks[1]
+        assert isinstance(chunk2["chunk_text"], str)
+        assert chunk2["chunk_text"] == "List of words"
         
         # Check third chunk (normal string)
-        page_num, chunk_text, embedding = chunks_with_embeddings[2]
-        assert isinstance(chunk_text, str)
-        assert chunk_text == "Another normal string"
+        chunk3 = mock_service.saved_chunks[2]
+        assert isinstance(chunk3["chunk_text"], str)
+        assert chunk3["chunk_text"] == "Another normal string"
 
 
 if __name__ == "__main__":

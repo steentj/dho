@@ -15,11 +15,17 @@ from pgvector.asyncpg import register_vector
 from .factory import create_database_factory
 from .interfaces import DatabaseConnection, BookRepository, SearchRepository, DatabaseFactory
 
+# Import the new book service interface
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from create_embeddings.book_service_interface import IBookService
+
 
 logger = logging.getLogger(__name__)
 
 
-class PostgreSQLService:
+class PostgreSQLService(IBookService):
     """
     High-level PostgreSQL service that maintains current application behavior.
     
@@ -155,6 +161,56 @@ class PostgreSQLService:
         """
         return PostgreSQLCursor(self)
     
+    # IBookService interface implementation
+    async def save_book_with_chunks(self, book: Dict[str, Any], table_name: str) -> int:
+        """Save a complete book with all its data (metadata, chunks, and embeddings)."""
+        self._ensure_connected()
+        
+        # Extract PDF URL from book dict (handle both formats)
+        pdf_url = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
+        
+        # Get or create book
+        book_id = await self._book_repository.find_book_by_url(pdf_url)
+        if not book_id:
+            book_id = await self._book_repository.create_book(
+                pdf_url=pdf_url,
+                title=book["titel"],
+                author=book["forfatter"],
+                pages=book["sider"]
+            )
+
+        # Prepare chunks with embeddings (chunk_text is already validated as string)
+        chunks_with_embeddings = []
+        for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+            chunks_with_embeddings.append((page_num, chunk_text, embedding))
+        
+        # Save chunks using the provider-specific table
+        await self._book_repository.save_chunks(book_id, chunks_with_embeddings, table_name)
+        
+        return book_id
+
+    async def book_exists_with_provider(self, pdf_url: str, provider_name: str) -> bool:
+        """Check if book exists with embeddings for a specific provider."""
+        self._ensure_connected()
+        
+        book_id = await self._book_repository.find_book_by_url(pdf_url)
+        if not book_id:
+            return False
+            
+        # Check if embeddings exist for this provider by querying the provider-specific table
+        table_name_mapping = {
+            "openai": "chunks",
+            "ollama": "chunks_nomic", 
+            "dummy": "chunks_dummy"
+        }
+        table_name = table_name_mapping.get(provider_name, f"chunks_{provider_name}")
+        
+        count = await self._connection.fetchval(
+            f"SELECT COUNT(*) FROM {table_name} WHERE book_id = $1", 
+            book_id
+        )
+        return count > 0
+    
     def _ensure_connected(self):
         """Ensure the service is connected to the database."""
         if not self._connection:
@@ -190,7 +246,7 @@ class PostgreSQLCursor:
         )
 
 
-class BookService:
+class BookService(IBookService):
     """
     Convenience service for book-related operations.
     
@@ -294,8 +350,17 @@ class BookService:
         # Create new book with provided metadata
         return await self._service.create_book(pdf_url, title, author, pages)
 
+    # IBookService interface implementation
+    async def save_book_with_chunks(self, book: Dict[str, Any], table_name: str) -> int:
+        """Save a complete book with all its data (metadata, chunks, and embeddings)."""
+        return await self._service.save_book_with_chunks(book, table_name)
+    
+    async def book_exists_with_provider(self, pdf_url: str, provider_name: str) -> bool:
+        """Check if book exists with embeddings for a specific provider."""
+        return await self._service.book_exists_with_provider(pdf_url, provider_name)
 
-class PostgreSQLPoolService:
+
+class PostgreSQLPoolService(IBookService):
     """
     Connection pool-based PostgreSQL service for concurrent operations.
     
@@ -450,6 +515,55 @@ class PostgreSQLPoolService:
                     # If it's a simple query result, wrap in dict format
                     return [{'count': rows[0]}] if len(rows) == 1 and len(rows[0]) == 1 else []
             return []
+
+    # BookService interface implementation
+    async def save_book_with_chunks(self, book: Dict[str, Any], table_name: str) -> int:
+        """Save a complete book with all its data (metadata, chunks, and embeddings)."""
+        # Extract PDF URL from book dict (handle both formats)
+        pdf_url = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
+        
+        async with self.get_book_repository() as book_repo:
+            # Get or create book
+            book_id = await book_repo.find_book_by_url(pdf_url)
+            if not book_id:
+                book_id = await book_repo.create_book(
+                    pdf_url=pdf_url,
+                    title=book["titel"],
+                    author=book["forfatter"],
+                    pages=book["sider"]
+                )
+
+            # Prepare chunks with embeddings (chunk_text is already validated as string)
+            chunks_with_embeddings = []
+            for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+                chunks_with_embeddings.append((page_num, chunk_text, embedding))
+            
+            # Save chunks using the provider-specific table
+            await book_repo.save_chunks(book_id, chunks_with_embeddings, table_name)
+            
+            return book_id
+
+    async def book_exists_with_provider(self, pdf_url: str, provider_name: str) -> bool:
+        """Check if book exists with embeddings for a specific provider."""
+        async with self.get_book_repository() as book_repo:
+            book_id = await book_repo.find_book_by_url(pdf_url)
+            if not book_id:
+                return False
+                
+            # Check if embeddings exist for this provider by querying the provider-specific table
+            table_name_mapping = {
+                "openai": "chunks",
+                "ollama": "chunks_nomic", 
+                "dummy": "chunks_dummy"
+            }
+            table_name = table_name_mapping.get(provider_name, f"chunks_{provider_name}")
+            
+            async with self.get_connection() as connection:
+                count = await connection.fetchval(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE book_id = $1", 
+                    book_id
+                )
+                return count > 0
 
 
 # Convenience functions for easy integration

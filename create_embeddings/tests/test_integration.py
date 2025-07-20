@@ -9,9 +9,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from create_embeddings.opret_bøger import parse_book
 from create_embeddings.chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy, ChunkingStrategyFactory
+from create_embeddings.book_service_interface import IBookService
 
 
-class MockBookService:
+class MockBookService(IBookService):
     """Mock BookService for testing"""
     
     def __init__(self):
@@ -48,6 +49,39 @@ class MockBookService:
             "chunk": chunk,
             "embedding": embedding
         })
+
+    # BookService interface implementation
+    async def save_book_with_chunks(self, book: dict, table_name: str) -> int:
+        """Save a complete book with all its data (metadata, chunks, and embeddings)."""
+        # Extract PDF URL from book dict (handle both formats)
+        pdf_url = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
+        
+        # Create book
+        book_id = await self.create_book(
+            pdf_url,
+            book["titel"],
+            book["forfatter"], 
+            book["sider"]
+        )
+        
+        # Save all chunks
+        for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
+            await self.create_chunk(book_id, page_num, chunk_text, embedding)
+            
+        return book_id
+
+    async def book_exists_with_provider(self, pdf_url: str, provider_name: str) -> bool:
+        """Check if book exists with embeddings for a specific provider."""
+        # Find book by URL
+        book = self.books.get(pdf_url)
+        if not book:
+            return False
+            
+        # For mock purposes, assume if book exists, it has embeddings
+        # In real implementation, this would check provider-specific tables
+        book_id = book["id"]
+        book_chunks = [chunk for chunk in self.chunks if chunk["book_id"] == book_id]
+        return len(book_chunks) > 0
 
 
 class MockEmbeddingProvider:

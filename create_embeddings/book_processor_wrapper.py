@@ -88,6 +88,7 @@ class BookProcessorWrapper:
     async def create_mock_service(self):
         """Create a mock service for testing."""
         from database.postgresql import PostgreSQLConnection
+        from database.factory import create_database_factory
         
         class DummyConnection:
             async def __aenter__(self): return self
@@ -104,6 +105,9 @@ class BookProcessorWrapper:
         # Create service that uses the dummy connection
         from database.postgresql_service import PostgreSQLService
         service = PostgreSQLService()
+        
+        # Initialize the service components manually for testing
+        service._factory = create_database_factory("postgresql")
         service._connection = connection
         service._book_repository = service._factory.create_book_repository(connection)
         service._search_repository = service._factory.create_search_repository(connection)
