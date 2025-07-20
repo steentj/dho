@@ -1,12 +1,6 @@
 # DHO Semantic Search System - AI Coding Agent Guide
 
-## 🔒 MANDATORY DEVELOPMENT PRINCIPLES - CAST IN STONE
-
-### **TINY STEP DEVELOPMENT - NON-NEGOTIABLE**
-- **ALWAYS develop in tiny steps**
-- **Each tiny step MUST include writing or updating tests** for new and changed code
-- **STOP after each tiny step and WAIT for manual confirmation** before continuing
-- **ALL tests in ALL areas of the codebase MUST pass** after each tiny step
+This document provides essential guidelines for AI coding agents working on the DHO Semantic Search System project. It outlines the architecture, critical dependencies, testing protocols, and development principles to ensure high-quality code and maintainability.
 
 ### **TWO MAJOR FUNCTIONAL AREAS**
 1. **Batch Program (Book Processing)**
@@ -69,7 +63,7 @@ These patterns prevent tests from reading production secrets and ensure repeatab
 
 - **`.env.template`**: Complete configuration reference with Danish comments
 - **Three providers**: `openai`, `ollama` (local), `dummy` (testing)
-- **Two chunking strategies**: `sentence_splitter` (default), `word_overlap` 
+- **Variable number of possible chunking strategies**: for now `sentence_splitter` (default), `word_overlap` 
 - **Validation**: `validate_config()` in `book_processor_wrapper.py` with cross-validation warnings
 
 ## Core Dependency Injection Interfaces
@@ -96,22 +90,22 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 # word_overlap: 400-word chunks with 50-word overlap, no title prefix
 ```
 
-## Development Workflow
 
-### **MANDATORY: Tiny Step Development Process**
+## 🔒 MANDATORY DEVELOPMENT PRINCIPLES
+
 1. **Plan First**: Create development phases with clear goals
-2. **Tiny Steps**: Develop each phase in small, testable increments
+2. **Tiny Steps**: Always develop each phase in small, testable increments
    - **NEVER proceed without writing/updating tests**
    - **NEVER skip test execution**
    - **NEVER continue without manual confirmation**
+   - **ALL tests in ALL areas of the codebase MUST pass** after each tiny step
 3. **Test-Driven**: Create/update tests for each step
-4. **Full Test Validation**: ALL tests across ALL areas must pass
-5. **Manual Confirmation**: Always ask for confirmation before proceeding
-6. **Cross-Area Impact Check**: Verify no side effects in:
+4. **Shortcomings in test tools including mocking and isolation** may never be solved by changing production code to fit tests - always adapt tests to match the code
+5. **Cross-Area Impact Check**: Verify no side effects in:
    - Book processing functionality
    - Search functionality  
    - API test GUI functionality
-7. **Documentation**: 
+6. **Documentation**:
     1. Create/update markdown plans with to-do's for each phase
     2. All user docs in `/documentation/` must be Danish, technical, and concise
     3. Documentation is stored as markdown files in `/documentation/` directory
