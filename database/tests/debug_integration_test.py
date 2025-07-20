@@ -7,11 +7,12 @@ import asyncio
 import sys
 import os
 
-# Ensure we can import from the current directory
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure we can import from the create_embeddings directory
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'create_embeddings'))
 
-from opret_bøger import parse_book, _process_cross_page_chunking
-from chunking import WordOverlapChunkingStrategy
+from create_embeddings.opret_bøger import parse_book
+from create_embeddings.chunking import WordOverlapChunkingStrategy
 import unittest.mock as mock
 
 
@@ -30,15 +31,16 @@ def create_mock_pdf(pages_content):
     mock_pdf = mock.MagicMock()
     mock_pdf.metadata = {"title": "Integration Test Book", "author": "Test Author"}
     mock_pdf.__len__ = mock.MagicMock(return_value=len(pages_content))
+    mock_pdf.close = mock.MagicMock()
     
-    mock_pages = []
-    for content in pages_content:
-        mock_page = mock.MagicMock()
-        mock_page.get_text.return_value = content
-        mock_pages.append(mock_page)
+    # Mock the extract_text_by_page function for the test
+    def extract_text_by_page(pdf):
+        return {i+1: content for i, content in enumerate(pages_content)}
     
-    mock_pdf.__getitem__ = mock.MagicMock(side_effect=mock_pages)
-    mock_pdf.close = mock.MagicMock()  # Add close method
+    # Patch the function in the module where it's used
+    import create_embeddings.opret_bøger
+    create_embeddings.opret_bøger.extract_text_by_page = extract_text_by_page
+    
     return mock_pdf
 
 
@@ -63,7 +65,7 @@ async def debug_test():
     strategy = WordOverlapChunkingStrategy()
     
     print("\n=== DIRECT CROSS-PAGE CHUNKING TEST ===")
-    cross_page_chunks = _process_cross_page_chunking(pdf_pages, 400, strategy, "Test Book")
+    cross_page_chunks = list(strategy.process_document(pdf_pages, 400, "Test Book"))
     print(f"Direct cross-page chunking produced {len(cross_page_chunks)} chunks:")
     for i, (page_num, chunk) in enumerate(cross_page_chunks):
         print(f"  Chunk {i+1}: Page {page_num}, {len(chunk.split())} words")

@@ -1,24 +1,24 @@
-from create_embeddings.opret_bøger import _process_cross_page_chunking, _find_starting_page
 from create_embeddings.chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy, ChunkingStrategyFactory
 
 
 def test_find_starting_page():
-    """Test the helper function for finding starting page"""
+    """Test the helper function for finding starting page within WordOverlapChunkingStrategy"""
+    strategy = WordOverlapChunkingStrategy()
     page_markers = [(0, 1), (50, 2), (120, 3), (200, 4)]
     
     # Test various word positions
-    assert _find_starting_page(0, page_markers) == 1
-    assert _find_starting_page(25, page_markers) == 1
-    assert _find_starting_page(50, page_markers) == 2
-    assert _find_starting_page(75, page_markers) == 2
-    assert _find_starting_page(120, page_markers) == 3
-    assert _find_starting_page(150, page_markers) == 3
-    assert _find_starting_page(200, page_markers) == 4
-    assert _find_starting_page(250, page_markers) == 4
+    assert strategy._find_starting_page(0, page_markers) == 1
+    assert strategy._find_starting_page(25, page_markers) == 1
+    assert strategy._find_starting_page(50, page_markers) == 2
+    assert strategy._find_starting_page(75, page_markers) == 2
+    assert strategy._find_starting_page(120, page_markers) == 3
+    assert strategy._find_starting_page(150, page_markers) == 3
+    assert strategy._find_starting_page(200, page_markers) == 4
+    assert strategy._find_starting_page(250, page_markers) == 4
     
     # Edge cases
-    assert _find_starting_page(0, []) == 1
-    assert _find_starting_page(100, [(0, 1)]) == 1
+    assert strategy._find_starting_page(0, []) == 1
+    assert strategy._find_starting_page(100, [(0, 1)]) == 1
 
 
 def test_process_cross_page_chunking_basic():
@@ -33,7 +33,7 @@ def test_process_cross_page_chunking_basic():
     strategy = WordOverlapChunkingStrategy()
     chunk_size = 500  # Large enough to not split this small text
     
-    result_chunks = _process_cross_page_chunking(pdf_pages, chunk_size, strategy, "Test Title")
+    result_chunks = list(strategy.process_document(pdf_pages, chunk_size, "Test Title"))
     
     # Should get at least one chunk
     assert len(result_chunks) > 0
@@ -58,7 +58,7 @@ def test_process_cross_page_chunking_spans_pages():
     strategy = WordOverlapChunkingStrategy()
     chunk_size = 400  # Target size that should create multiple chunks (500 total words / 400 per chunk = ~2 chunks)
     
-    result_chunks = _process_cross_page_chunking(pdf_pages, chunk_size, strategy, "Test Title")
+    result_chunks = list(strategy.process_document(pdf_pages, chunk_size, "Test Title"))
     
     assert len(result_chunks) >= 2  # Should create multiple chunks
     
@@ -87,7 +87,7 @@ def test_process_cross_page_chunking_preserves_overlap():
     strategy = WordOverlapChunkingStrategy()
     chunk_size = 400  # Should create multiple chunks with overlap
     
-    result_chunks = _process_cross_page_chunking(pdf_pages, chunk_size, strategy, "Test Title")
+    result_chunks = list(strategy.process_document(pdf_pages, chunk_size, "Test Title"))
     
     assert len(result_chunks) >= 3  # Should create multiple chunks
     
@@ -122,14 +122,10 @@ def test_cross_page_chunking_vs_page_by_page():
     chunk_size = 400
     
     # Get cross-page chunks (word overlap)
-    cross_page_chunks = _process_cross_page_chunking(pdf_pages, chunk_size, word_overlap_strategy, "Test")
+    cross_page_chunks = list(word_overlap_strategy.process_document(pdf_pages, chunk_size, "Test"))
     
     # Simulate page-by-page chunks (sentence strategy)
-    page_by_page_chunks = []
-    for page_num, page_text in pdf_pages.items():
-        for chunk in sentence_strategy.chunk_text(page_text, chunk_size, "Test"):
-            if chunk.strip():
-                page_by_page_chunks.append((page_num, chunk))
+    page_by_page_chunks = list(sentence_strategy.process_document(pdf_pages, chunk_size, "Test"))
     
     # Cross-page should produce fewer, larger chunks
     cross_page_count = len(cross_page_chunks)
@@ -158,32 +154,16 @@ def test_backward_compatibility_sentence_splitter():
         3: "Third page begins now. Final content here."
     }
     
-    from create_embeddings.opret_bøger import _process_cross_page_chunking
-    
     sentence_strategy = SentenceSplitterChunkingStrategy()
     
-    # This should NOT be called for SentenceSplitterChunkingStrategy in parse_book
-    # But let's verify it would work if accidentally called
-    try:
-        cross_page_result = _process_cross_page_chunking(pdf_pages, 20, sentence_strategy, "Title")
-        # Should work without error, even if not intended for this strategy
-        assert len(cross_page_result) > 0
-    except Exception:
-        # If it fails, that's also acceptable since it's not meant for this strategy
-        pass
-    
-    # Test traditional page-by-page processing (what should actually happen)
-    page_by_page_chunks = []
-    for page_num, page_text in pdf_pages.items():
-        for chunk in sentence_strategy.chunk_text(page_text, 20, "Title"):
-            if chunk.strip():
-                page_by_page_chunks.append((page_num, chunk))
+    # Test that SentenceSplitterChunkingStrategy uses page-by-page processing via process_document
+    result = list(sentence_strategy.process_document(pdf_pages, 20, "Title"))
     
     # Should have chunks from each page
-    assert len(page_by_page_chunks) >= 3  # At least one chunk per page
+    assert len(result) >= 3  # At least one chunk per page
     
     # Each chunk should have title prefix (SentenceSplitterChunkingStrategy behavior)
-    for page_num, chunk in page_by_page_chunks:
+    for page_num, chunk in result:
         assert chunk.startswith("##Title##"), f"Chunk missing title: {chunk[:50]}"
 
 

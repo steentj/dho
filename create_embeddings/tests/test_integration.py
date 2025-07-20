@@ -268,16 +268,11 @@ async def test_chunking_strategy_factory_integration():
         2: "Page two begins here. More content on page two. Final text on this page."
     }
     
-    # Simulate cross-page chunking
-    from opret_bøger import _process_cross_page_chunking
-    word_overlap_chunks = _process_cross_page_chunking(test_pages, 400, word_overlap_strategy, "Test")
+    # Test cross-page chunking via process_document
+    word_overlap_chunks = list(word_overlap_strategy.process_document(test_pages, 400, "Test"))
     
-    # Simulate page-by-page chunking
-    sentence_chunks = []
-    for page_num, page_text in test_pages.items():
-        for chunk in sentence_strategy.chunk_text(page_text, 50, "Test"):
-            if chunk.strip():
-                sentence_chunks.append((page_num, chunk))
+    # Test page-by-page chunking via process_document
+    sentence_chunks = list(sentence_strategy.process_document(test_pages, 50, "Test"))
     
     # Should produce different results
     assert len(word_overlap_chunks) != len(sentence_chunks) or word_overlap_chunks != sentence_chunks

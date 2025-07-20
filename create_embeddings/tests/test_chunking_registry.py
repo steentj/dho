@@ -29,6 +29,12 @@ class MockChunkingStrategy(ChunkingStrategy):
     
     def supports_cross_page_chunking(self) -> bool:
         return True
+    
+    def process_document(self, pages_text: dict[int, str], chunk_size: int, title: str) -> Iterable[tuple[int, str]]:
+        """Mock implementation of process_document."""
+        for page_num, page_text in pages_text.items():
+            for chunk_text in self.chunk_text(page_text, chunk_size, title):
+                yield (page_num, chunk_text)
 
 
 @pytest.mark.unit

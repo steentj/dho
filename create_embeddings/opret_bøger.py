@@ -119,85 +119,16 @@ async def parse_book(pdf, book_url, chunk_size, embedding_provider: EmbeddingPro
 
         pdf_pages = extract_text_by_page(pdf)
 
-        # Use polymorphic method to determine chunking approach
-        if chunking_strategy.supports_cross_page_chunking():
-            # Cross-page chunking: concatenate all pages and track page boundaries
-            page_chunks = _process_cross_page_chunking(pdf_pages, chunk_size, chunking_strategy, book["titel"])
-            
-            for page_num, chunk_text in page_chunks:
-                if chunk_text.strip():  # Ignorer tomme chunks
-                    book["chunks"].append((page_num, chunk_text))
-                    embedding = await embedding_provider.get_embedding(chunk_text)
-                    book["embeddings"].append(embedding)
-        else:
-            # Traditional page-by-page chunking for other strategies
-            for page_num, page_text in pdf_pages.items():
-                for chunk in chunking_strategy.chunk_text(page_text, chunk_size, book["titel"]):
-                    if chunk.strip():  # Ignorer tomme chunks
-                        book["chunks"].append((page_num, chunk))
-                        embedding = await embedding_provider.get_embedding(chunk)
-                        book["embeddings"].append(embedding)
+        # Use the strategy's process_document method to handle all chunking logic
+        for page_num, chunk_text in chunking_strategy.process_document(pdf_pages, chunk_size, book["titel"]):
+            book["chunks"].append((page_num, chunk_text))
+            embedding = await embedding_provider.get_embedding(chunk_text)
+            book["embeddings"].append(embedding)
+
     finally:
         pdf.close()  # Luk PDF for at frigøre ressourcer
 
     return book
-
-
-def _process_cross_page_chunking(pdf_pages: dict, chunk_size: int, chunking_strategy, title: str) -> list[tuple[int, str]]:
-    """
-    Process text across multiple pages and return chunks with their starting page numbers.
-    Returns list of (page_num, chunk_text) tuples.
-    """
-    # Build page markers and concatenated text
-    full_text_parts = []
-    page_markers = []  # Track where each page starts in the full text
-    current_word_position = 0
-    
-    for page_num in sorted(pdf_pages.keys()):
-        page_text = pdf_pages[page_num].strip()
-        if page_text:
-            page_markers.append((current_word_position, page_num))
-            full_text_parts.append(page_text)
-            current_word_position += len(page_text.split())
-    
-    # Concatenate all pages
-    full_text = " ".join(full_text_parts)
-    
-    # Get chunks from the strategy
-    chunks = list(chunking_strategy.chunk_text(full_text, chunk_size, title))
-    
-    # Determine starting page for each chunk
-    result_chunks = []
-    current_word_pos = 0
-    
-    for chunk in chunks:
-        chunk_start_page = _find_starting_page(current_word_pos, page_markers)
-        result_chunks.append((chunk_start_page, chunk))
-        
-        # Move position forward by the number of words in this chunk
-        current_word_pos += len(chunk.split())
-    
-    return result_chunks
-
-
-def _find_starting_page(word_position: int, page_markers: list[tuple[int, int]]) -> int:
-    """
-    Find which page a given word position starts on.
-    page_markers is a list of (word_position, page_num) tuples.
-    """
-    if not page_markers:
-        return 1
-    
-    # Find the last page marker that starts before or at the given position
-    starting_page = page_markers[0][1]  # Default to first page
-    
-    for marker_pos, page_num in page_markers:
-        if marker_pos <= word_position:
-            starting_page = page_num
-        else:
-            break
-    
-    return starting_page
 
 
 async def process_book(book_url, chunk_size, book_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):

@@ -35,6 +35,25 @@ class ChunkingStrategy(ABC):
         """
         pass
 
+    @abstractmethod
+    def process_document(self, pages_text: Dict[int, str], chunk_size: int, title: str) -> Iterable[tuple[int, str]]:
+        """
+        Process entire document and return chunks with their starting page numbers.
+        
+        This method handles the complete document processing workflow,
+        deciding internally whether to use cross-page or page-by-page chunking
+        based on the strategy's capabilities.
+
+        Args:
+            pages_text: Dictionary mapping page numbers to their text content
+            chunk_size: Maximum tokens per chunk
+            title: Document title to be added to chunks (if supported by strategy)
+
+        Returns:
+            An iterable of (page_num, chunk_text) tuples
+        """
+        pass
+
 def _add_title_to_chunk(chunk_sentences: list[str], title: str | None) -> list[str]:
     """Prepend title to the first sentence of a chunk if a title is provided."""
     if title and chunk_sentences:
@@ -118,6 +137,18 @@ class SentenceSplitterChunkingStrategy(ChunkingStrategy):
             False - this strategy processes pages individually
         """
         return False
+
+    def process_document(self, pages_text: Dict[int, str], chunk_size: int, title: str) -> Iterable[tuple[int, str]]:
+        """
+        Process document page-by-page for SentenceSplitterChunkingStrategy.
+        
+        Since this strategy does not support cross-page chunking, it processes
+        each page individually and yields chunks with their original page numbers.
+        """
+        for page_num, page_text in pages_text.items():
+            for chunk_text in self.chunk_text(page_text, chunk_size, title):
+                if chunk_text.strip():  # Skip empty chunks
+                    yield (page_num, chunk_text)
 
 
 class WordOverlapChunkingStrategy(ChunkingStrategy):
@@ -251,6 +282,62 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
             True - this strategy benefits from cross-page processing
         """
         return True
+
+    def process_document(self, pages_text: Dict[int, str], chunk_size: int, title: str) -> Iterable[tuple[int, str]]:
+        """
+        Process document with cross-page chunking for WordOverlapChunkingStrategy.
+        
+        This strategy concatenates all pages and creates overlapping chunks
+        that can span page boundaries. Each chunk is assigned to the page
+        where it begins.
+        """
+        # Build page markers and concatenated text
+        full_text_parts = []
+        page_markers = []  # Track where each page starts in the full text
+        current_word_position = 0
+        
+        for page_num in sorted(pages_text.keys()):
+            page_text = pages_text[page_num].strip()
+            if page_text:
+                page_markers.append((current_word_position, page_num))
+                full_text_parts.append(page_text)
+                current_word_position += len(page_text.split())
+        
+        # Concatenate all pages
+        full_text = " ".join(full_text_parts)
+        
+        # Get chunks from the strategy
+        chunks = list(self.chunk_text(full_text, chunk_size, title))
+        
+        # Determine starting page for each chunk
+        current_word_pos = 0
+        
+        for chunk in chunks:
+            if chunk.strip():  # Skip empty chunks
+                chunk_start_page = self._find_starting_page(current_word_pos, page_markers)
+                yield (chunk_start_page, chunk)
+                
+                # Move position forward by the number of words in this chunk
+                current_word_pos += len(chunk.split())
+    
+    def _find_starting_page(self, word_position: int, page_markers: list[tuple[int, int]]) -> int:
+        """
+        Find which page a given word position starts on.
+        page_markers is a list of (word_position, page_num) tuples.
+        """
+        if not page_markers:
+            return 1
+        
+        # Find the last page marker that starts before or at the given position
+        starting_page = page_markers[0][1]  # Default to first page
+        
+        for marker_pos, page_num in page_markers:
+            if marker_pos <= word_position:
+                starting_page = page_num
+            else:
+                break
+        
+        return starting_page
 
 
 class ChunkingStrategyRegistry:
