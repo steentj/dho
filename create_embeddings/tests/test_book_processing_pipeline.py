@@ -203,16 +203,16 @@ async def test_pipeline_handles_fetch_failure():
 
 
 @pytest.mark.asyncio
-async def test_pipeline_defensive_chunk_text_fix():
-    """Test pipeline applies defensive fix for chunk_text data types."""
+async def test_pipeline_processes_valid_chunk_text():
+    """Test pipeline processes valid chunk_text types from chunking strategies."""
     book_service = MockBookService()
     embedding_provider = MockEmbeddingProvider()
     
-    # Mock strategy that returns list instead of string (triggering defensive fix)
+    # Mock strategy that returns proper string chunks
     chunking_strategy = Mock()
     chunking_strategy.process_document.return_value = [
-        (1, ["word1", "word2", "word3"]),  # Invalid: list instead of string
-        (2, "valid string chunk")  # Valid: string
+        (1, "valid string chunk one"),  # Valid: string
+        (2, "valid string chunk two")   # Valid: string
     ]
     
     pipeline = BookProcessingPipeline(
@@ -242,9 +242,9 @@ async def test_pipeline_defensive_chunk_text_fix():
     
     saved_book, _ = book_service.saved_books[0]
     
-    # Check that chunk text was fixed
-    assert saved_book["chunks"][0] == (1, "word1 word2 word3")  # List converted to string
-    assert saved_book["chunks"][1] == (2, "valid string chunk")  # String left as-is
+    # Check that valid chunk texts are preserved as-is
+    assert saved_book["chunks"][0] == (1, "valid string chunk one")  # String preserved
+    assert saved_book["chunks"][1] == (2, "valid string chunk two")  # String preserved
 
 
 @pytest.mark.asyncio 

@@ -194,7 +194,7 @@ class BookProcessingPipeline:
     
     async def _save_book_data(self, book_data: Dict[str, Any]) -> None:
         """
-        Save book data to database with defensive type checking.
+        Save book data to database.
         
         Args:
             book_data: Complete book data with chunks and embeddings
@@ -202,32 +202,8 @@ class BookProcessingPipeline:
         # Get the provider-specific table name
         table_name = self.embedding_provider.get_table_name()
         
-        # DEFENSIVE FIX: Ensure chunk_text is always a string before passing to service
-        # This prevents the "expected str, got list" PostgreSQL error
-        fixed_book = book_data.copy()
-        fixed_chunks = []
-        
-        for (page_num, chunk_text), embedding in zip(book_data["chunks"], book_data["embeddings"]):
-            if isinstance(chunk_text, list):
-                # Join list elements into a single string
-                chunk_text = " ".join(str(item) for item in chunk_text)
-                logger.warning(
-                    f"Fixed chunk_text data type: converted list to string for page {page_num}"
-                )
-            elif not isinstance(chunk_text, str):
-                # Convert any other type to string
-                chunk_text = str(chunk_text)
-                logger.warning(
-                    f"Fixed chunk_text data type: converted {type(chunk_text)} to string for page {page_num}"
-                )
-            
-            fixed_chunks.append((page_num, chunk_text))
-        
-        # Update the book with fixed chunks
-        fixed_book["chunks"] = fixed_chunks
-        
         # Save using the book service interface
-        await self.book_service.save_book_with_chunks(fixed_book, table_name)
+        await self.book_service.save_book_with_chunks(book_data, table_name)
         
         logger.info(
             f"Successfully saved book {book_data['titel']} with "

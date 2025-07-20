@@ -148,6 +148,12 @@ class SentenceSplitterChunkingStrategy(ChunkingStrategy):
         for page_num, page_text in pages_text.items():
             for chunk_text in self.chunk_text(page_text, chunk_size, title):
                 if chunk_text.strip():  # Skip empty chunks
+                    # Ensure chunking strategy returns proper string type
+                    if not isinstance(chunk_text, str):
+                        raise TypeError(
+                            f"SentenceSplitterChunkingStrategy.chunk_text must return strings, "
+                            f"got {type(chunk_text)} for page {page_num}"
+                        )
                     yield (page_num, chunk_text)
 
 
@@ -314,6 +320,13 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
         
         for chunk in chunks:
             if chunk.strip():  # Skip empty chunks
+                # Ensure chunking strategy returns proper string type
+                if not isinstance(chunk, str):
+                    raise TypeError(
+                        f"WordOverlapChunkingStrategy.chunk_text must return strings, "
+                        f"got {type(chunk)} at word position {current_word_pos}"
+                    )
+                
                 chunk_start_page = self._find_starting_page(current_word_pos, page_markers)
                 yield (chunk_start_page, chunk)
                 
