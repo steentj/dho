@@ -1,7 +1,55 @@
 import unittest.mock as mock
 import pytest
-from create_embeddings.opret_bøger import parse_book
+from create_embeddings.book_processing_pipeline import BookProcessingPipeline
 from create_embeddings.chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy
+from create_embeddings.book_service_interface import IBookService
+
+
+class MockBookService(IBookService):
+    """Mock book service for testing."""
+    def __init__(self):
+        pass
+    
+    async def save_book_with_chunks(self, book, table_name: str) -> int:
+        return 1
+    
+    async def book_exists_with_provider(self, pdf_url: str, provider_name: str) -> bool:
+        return False
+
+
+class MockEmbeddingProvider:
+    """Mock embedding provider for testing"""
+    
+    def __init__(self):
+        self.call_count = 0
+    
+    async def get_embedding(self, text: str):
+        self.call_count += 1
+        return [0.1] * 1536
+    
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        return False
+    
+    def get_provider_name(self) -> str:
+        return "mock_provider"
+    
+    def get_table_name(self) -> str:
+        return "chunks_mock"
+
+
+async def parse_book_with_pipeline(pdf, book_url, chunk_size, embedding_provider, chunking_strategy):
+    """Helper function that uses the pipeline to parse a book"""
+    book_service = MockBookService()
+    pipeline = BookProcessingPipeline(
+        book_service=book_service,
+        embedding_provider=embedding_provider,
+        chunking_strategy=chunking_strategy
+    )
+    
+    # Extract the book data using pipeline's internal method
+    book_data = await pipeline._parse_pdf_to_book_data(pdf, book_url, chunk_size)
+    
+    return book_data
 
 
 @pytest.mark.asyncio
@@ -24,13 +72,12 @@ async def test_parse_book_integration_word_overlap():
     mock_pdf.__getitem__ = mock.MagicMock(side_effect=[mock_page1, mock_page2, mock_page3])
     
     # Mock embedding provider
-    mock_embedding_provider = mock.MagicMock()
-    mock_embedding_provider.get_embedding = mock.AsyncMock(return_value=[0.1] * 1536)
+    mock_embedding_provider = MockEmbeddingProvider()
     
     # Test with WordOverlapChunkingStrategy
     word_overlap_strategy = WordOverlapChunkingStrategy()
     
-    book_result = await parse_book(
+    book_result = await parse_book_with_pipeline(
         pdf=mock_pdf,
         book_url="test-url",
         chunk_size=400,
@@ -83,7 +130,7 @@ async def test_parse_book_integration_sentence_splitter():
     # Test with SentenceSplitterChunkingStrategy
     sentence_strategy = SentenceSplitterChunkingStrategy()
     
-    book_result = await parse_book(
+    book_result = await parse_book_with_pipeline(
         pdf=mock_pdf,
         book_url="test-url",
         chunk_size=20,  # Small chunks to force multiple chunks per page

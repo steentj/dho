@@ -5,7 +5,7 @@ This test validates that the fix prevents the "expected str, got list" error.
 """
 
 import pytest
-from create_embeddings.opret_bøger import save_book
+from create_embeddings.book_processing_pipeline import BookProcessingPipeline
 from create_embeddings.book_service_interface import IBookService
 
 
@@ -38,11 +38,31 @@ class MockBookService(IBookService):
 class MockEmbeddingProvider:
     """Mock embedding provider for testing"""
     
+    async def get_embedding(self, text: str):
+        """Mock get_embedding method"""
+        return [0.1] * 768
+    
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        """Mock implementation for abstract method."""
+        return False
+    
     def get_table_name(self):
         return "chunks_test"
     
     def get_provider_name(self):
         return "test_provider"
+
+
+async def save_book_with_pipeline(book, book_service, embedding_provider):
+    """Helper function that uses the pipeline to save a book - replacement for the old save_book function"""
+    pipeline = BookProcessingPipeline(
+        book_service=book_service,
+        embedding_provider=embedding_provider,
+        chunking_strategy=None  # Not needed for direct save test
+    )
+    
+    # Use the pipeline's internal save method that contains the defensive fix
+    await pipeline._save_book_data(book)
 
 
 class TestDefensiveFix:
@@ -70,7 +90,7 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await save_book(book, mock_service, mock_embedding_provider)
+        await save_book_with_pipeline(book, mock_service, mock_embedding_provider)
         
         # Verify the chunk text is passed as string
         assert len(mock_service.saved_chunks) == 1
@@ -90,7 +110,7 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await save_book(book, mock_service, mock_embedding_provider)
+        await save_book_with_pipeline(book, mock_service, mock_embedding_provider)
         
         # Check that list chunk_text was converted to string
         assert len(mock_service.saved_chunks) == 1
@@ -110,7 +130,7 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await save_book(book, mock_service, mock_embedding_provider)
+        await save_book_with_pipeline(book, mock_service, mock_embedding_provider)
         
         # Check that integer chunk_text was converted to string
         assert len(mock_service.saved_chunks) == 1
@@ -130,7 +150,7 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768]
         }
         
-        await save_book(book, mock_service, mock_embedding_provider)
+        await save_book_with_pipeline(book, mock_service, mock_embedding_provider)
         
         # Check that empty list becomes empty string
         assert len(mock_service.saved_chunks) == 1
@@ -154,7 +174,7 @@ class TestDefensiveFix:
             "embeddings": [[0.1] * 768, [0.2] * 768, [0.3] * 768]
         }
         
-        await save_book(book, mock_service, mock_embedding_provider)
+        await save_book_with_pipeline(book, mock_service, mock_embedding_provider)
         
         # Check all chunks are properly converted
         assert len(mock_service.saved_chunks) == 3

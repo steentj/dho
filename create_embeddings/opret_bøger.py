@@ -65,100 +65,19 @@ def extract_text_by_page(pdf) -> dict:
     return pages_text
 
 
-async def save_book(book, book_service, embedding_provider: EmbeddingProvider):
-    """Gem bogens metadata, tekst og embeddings i databasen using dependency injection."""
-    try:
-        # Get the provider-specific table name
-        table_name = embedding_provider.get_table_name()
-        
-        # DEFENSIVE FIX: Ensure chunk_text is always a string before passing to service
-        # This prevents the "expected str, got list" PostgreSQL error
-        fixed_book = book.copy()
-        fixed_chunks = []
-        
-        for (page_num, chunk_text), embedding in zip(book["chunks"], book["embeddings"]):
-            if isinstance(chunk_text, list):
-                # Join list elements into a single string
-                chunk_text = " ".join(str(item) for item in chunk_text)
-                logger.warning(f"Fixed chunk_text data type: converted list to string for page {page_num}")
-            elif not isinstance(chunk_text, str):
-                # Convert any other type to string
-                chunk_text = str(chunk_text)
-                logger.warning(f"Fixed chunk_text data type: converted {type(chunk_text)} to string for page {page_num}")
-            
-            fixed_chunks.append((page_num, chunk_text))
-        
-        # Update the book with fixed chunks
-        fixed_book["chunks"] = fixed_chunks
-        
-        # Use the BookService interface - no more magic string detection!
-        await book_service.save_book_with_chunks(fixed_book, table_name)
-            
-        logging.info(f"Successfully saved book {book['titel']} with {len(book['chunks'])} chunks to {table_name} table")
-        
-    except Exception as e:
-        book_url = book.get("pdf_url") or book.get("url") or book.get("pdf-url")
-        logging.exception(
-            f"Fejl ved indsættelse af bog {book_url} i databasen: {e}"
-        )
-        raise
-
-
-async def parse_book(pdf, book_url, chunk_size, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
-    """Udtræk tekst fra PDF, opdel i chunks, generer embeddings."""
-    try:
-        metadata = pdf.metadata or {}  # Håndter manglende metadata
-        book = {
-            "pdf-url": book_url,  # Standard key used throughout the system
-            "titel": metadata.get("title", "Ukendt Titel"),
-            "forfatter": metadata.get("author", "Ukendt Forfatter"),
-            "sider": len(pdf),
-            "chunks": [],
-            "embeddings": [],
-        }
-
-        pdf_pages = extract_text_by_page(pdf)
-
-        # Use the strategy's process_document method to handle all chunking logic
-        for page_num, chunk_text in chunking_strategy.process_document(pdf_pages, chunk_size, book["titel"]):
-            book["chunks"].append((page_num, chunk_text))
-            embedding = await embedding_provider.get_embedding(chunk_text)
-            book["embeddings"].append(embedding)
-
-    finally:
-        pdf.close()  # Luk PDF for at frigøre ressourcer
-
-    return book
-
-
 async def process_book(book_url, chunk_size, book_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
-    """Behandl en enkelt bog fra URL til database using dependency injection."""
-    try:
-        # Check if book already exists with embeddings for this provider
-        has_embeddings = await book_service.book_exists_with_provider(book_url, embedding_provider.get_provider_name())
-        if has_embeddings:
-            logging.info(f"Bogen {book_url} er allerede behandlet med {embedding_provider.get_provider_name()} provider - springer over")
-            return
-
-        # If book doesn't exist or embeddings don't exist for this provider, fetch PDF and process it
-        try:
-            pdf = await fetch_pdf(book_url, session)
-        except Exception as e:
-            # Handle network errors gracefully - treat like fetch_pdf returning None
-            logging.warning(f"Netværksfejl ved hentning af PDF fra {book_url}: {e}")
-            pdf = None
-        
-        if pdf:
-            book = await parse_book(pdf, book_url, chunk_size, embedding_provider, chunking_strategy)
-            await save_book(book, book_service, embedding_provider)
-            logging.info(f"{book['titel']} fra {book_url} er behandlet og gemt i databasen")
-        else:
-            logging.warning(f"Kunne ikke hente PDF fra {book_url}")
-            # Don't raise exception - just log and continue
-            
-    except Exception as e:
-        logging.exception(f"Fejl ved behandling af {book_url}: {type(e).__name__}")
-        raise  # Re-raise the exception so the wrapper can count it as failed
+    """Behandl en enkelt bog fra URL til database using dependency injection and pipeline pattern."""
+    from .book_processing_pipeline import BookProcessingPipeline
+    
+    # Create pipeline with injected dependencies
+    pipeline = BookProcessingPipeline(
+        book_service=book_service,
+        embedding_provider=embedding_provider,
+        chunking_strategy=chunking_strategy
+    )
+    
+    # Delegate to pipeline
+    await pipeline.process_book_from_url(book_url, chunk_size, session)
 
 async def main():
     """Hovedfunktion for at hente og behandle alle bøger using dependency injection."""
@@ -236,8 +155,6 @@ __all__ = [
     'indlæs_urls',
     'fetch_pdf',
     'extract_text_by_page',
-    'save_book',
-    'parse_book',
     'process_book',
     'main',
     'semaphore_guard'

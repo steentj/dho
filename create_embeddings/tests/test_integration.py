@@ -3,11 +3,12 @@ import unittest.mock as mock
 from unittest.mock import AsyncMock
 import sys
 import os
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from create_embeddings.opret_bøger import parse_book
+from create_embeddings.book_processing_pipeline import BookProcessingPipeline
 from create_embeddings.chunking import WordOverlapChunkingStrategy, SentenceSplitterChunkingStrategy, ChunkingStrategyFactory
 from create_embeddings.book_service_interface import IBookService
 
@@ -97,6 +98,18 @@ class MockEmbeddingProvider:
         # Create a deterministic but varied embedding based on text length and content
         base_value = len(text) / 1000.0
         return [base_value + (i / self.embedding_size) for i in range(self.embedding_size)]
+    
+    async def has_embeddings_for_book(self, book_id: int, db_service) -> bool:
+        """Mock implementation for abstract method."""
+        return False
+    
+    def get_provider_name(self) -> str:
+        """Get provider name."""
+        return "mock_provider"
+    
+    def get_table_name(self) -> str:
+        """Get table name."""
+        return "chunks_mock"
 
 
 def create_mock_pdf(pages_content):
@@ -116,6 +129,22 @@ def create_mock_pdf(pages_content):
     return mock_pdf
 
 
+async def parse_book_with_pipeline(pdf, book_url, chunk_size, embedding_provider, chunking_strategy):
+    """Helper function that uses the pipeline to parse a book - replacement for the old parse_book function"""
+    book_service = MockBookService()
+    pipeline = BookProcessingPipeline(
+        book_service=book_service,
+        embedding_provider=embedding_provider,
+        chunking_strategy=chunking_strategy
+    )
+    
+    # Extract the book data using pipeline's internal method
+    book_data = await pipeline._parse_pdf_to_book_data(pdf, book_url, chunk_size)
+    
+    return book_data
+
+
+@pytest.mark.asyncio
 async def test_word_overlap_end_to_end_integration():
     """Test complete end-to-end processing with WordOverlapChunkingStrategy"""
     
@@ -135,8 +164,8 @@ async def test_word_overlap_end_to_end_integration():
     chunking_strategy = WordOverlapChunkingStrategy()
     chunk_size = 400
     
-    # Test parse_book function directly
-    book_result = await parse_book(
+    # Test parse_book function with pipeline
+    book_result = await parse_book_with_pipeline(
         pdf=mock_pdf,
         book_url="test://integration-test.pdf",
         chunk_size=chunk_size,
@@ -200,6 +229,7 @@ async def test_word_overlap_end_to_end_integration():
             print("No overlap detected with sentence pattern matching (this may be normal)")
 
 
+@pytest.mark.asyncio
 async def test_sentence_splitter_end_to_end_integration():
     """Test complete end-to-end processing with SentenceSplitterChunkingStrategy for comparison"""
     
@@ -217,8 +247,8 @@ async def test_sentence_splitter_end_to_end_integration():
     chunking_strategy = SentenceSplitterChunkingStrategy()
     chunk_size = 50  # Small to create multiple chunks per page
     
-    # Test parse_book function directly
-    book_result = await parse_book(
+    # Test parse_book function with pipeline
+    book_result = await parse_book_with_pipeline(
         pdf=mock_pdf,
         book_url="test://sentence-splitter-test.pdf",
         chunk_size=chunk_size,
@@ -252,6 +282,7 @@ async def test_sentence_splitter_end_to_end_integration():
     assert mock_embedding_provider.call_count == len(book_result["chunks"])
 
 
+@pytest.mark.asyncio
 async def test_chunking_strategy_factory_integration():
     """Test that the factory works correctly in integration scenarios"""
     
@@ -286,6 +317,7 @@ async def test_chunking_strategy_factory_integration():
         assert chunk.startswith("##Test##")
 
 
+@pytest.mark.asyncio
 async def test_database_integration_simulation():
     """Test the database interaction simulation"""
     
@@ -298,8 +330,8 @@ async def test_database_integration_simulation():
     
     chunking_strategy = WordOverlapChunkingStrategy()
     
-    # Parse the book
-    book_result = await parse_book(
+    # Parse the book with pipeline
+    book_result = await parse_book_with_pipeline(
         pdf=mock_pdf,
         book_url="test://db-test.pdf",
         chunk_size=400,
