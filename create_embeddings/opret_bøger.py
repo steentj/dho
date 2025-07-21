@@ -11,12 +11,8 @@ from create_embeddings.chunking import ChunkingStrategy
 sys.path.append(str(Path(__file__).parent.parent))
 
 # Import embedding providers from the new providers package
-from create_embeddings.providers import (
-    EmbeddingProvider,
-    EmbeddingProviderFactory
-)
-# Import classes for backward compatibility - these are re-exported
-from create_embeddings.providers import OpenAIEmbeddingProvider, DummyEmbeddingProvider
+from create_embeddings.providers import EmbeddingProvider
+
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -116,21 +112,6 @@ async def main():
         logging.exception(f"Fatal fejl i hovedprogrammet: {type(e).__name__}")
         raise
 
-
-
-
-# Backward compatibility exports - these need to be available for existing code
-__all__ = [
-    'EmbeddingProvider',
-    'OpenAIEmbeddingProvider', 
-    'DummyEmbeddingProvider',
-    'EmbeddingProviderFactory',
-    'indlæs_urls',
-    'fetch_pdf',
-    'extract_text_by_page',
-    'process_book',
-    'main'
-]
 
 if __name__ == "__main__":
     asyncio.run(main())

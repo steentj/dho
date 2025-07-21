@@ -17,13 +17,20 @@ class Timer:
         self.duration = self.end - self.start
 
 @pytest.mark.asyncio
-async def test_ollama_embedding_generation(test_db, ollama_provider, test_book_chunks):
+async def test_ollama_embedding_generation(test_db, ollama_provider):
     """Test generating embeddings with Ollama provider."""
     # Insert test book
     book_id = await test_db.fetchval(
         'INSERT INTO books (title) VALUES ($1) RETURNING id',
         'Test Book'
     )
+    
+    # Create some test chunks
+    test_book_chunks = [
+        "This is the first test chunk.",
+        "Here is another test chunk with different content.",
+        "A third chunk for more comprehensive testing."
+    ]
     
     # Generate and store embeddings
     for i, chunk in enumerate(test_book_chunks):
