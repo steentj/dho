@@ -278,13 +278,15 @@ def extract_text_from_chunk(raw_chunk: str):
         raw_chunk (str): The raw chunk of text to be split.
 
     Returns:
-        str: The third part of the split raw chunk.
+        str: The text part after the title marker, or the original text if no marker exists.
     """
     parts = raw_chunk.split("##", 2)
-    if len(parts) > 1:
+    if len(parts) >= 3:  # We have both opening and closing ## markers
         text = parts[2]
+    elif len(parts) == 2:  # We only have an opening ## marker
+        text = ""  # Return empty string if there's no content after the title
     else:
-        text = parts[0]
+        text = parts[0]  # No markers, return the original text
     return text
 
 if __name__ == "__main__":
