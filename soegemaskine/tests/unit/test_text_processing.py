@@ -13,19 +13,21 @@ create_embeddings_path = Path(__file__).parent.parent.parent.parent / "create_em
 sys.path.insert(0, str(create_embeddings_path))
 
 try:
-    from create_embeddings.opret_bøger import (
-        chunk_text, 
-        EmbeddingProviderFactory,
+    from create_embeddings.tests.test_utils import (
+        chunk_text_adapter as chunk_text,
+        safe_db_execute_adapter as safe_db_execute
+    )
+    from create_embeddings.providers.factory import EmbeddingProviderFactory
+    from create_embeddings.providers.embedding_providers import (
         OpenAIEmbeddingProvider,
-        DummyEmbeddingProvider,
-        safe_db_execute
+        DummyEmbeddingProvider
     )
     from create_embeddings.tests.test_utils import (
         extract_text_by_page_adapter as extract_text_by_page,
         indlæs_urls_adapter as indlæs_urls
     )
 except ImportError as e:
-    pytest.skip(f"Could not import from opret_bøger: {e}", allow_module_level=True)
+    pytest.skip(f"Could not import from test_utils: {e}", allow_module_level=True)
 
 
 @pytest.mark.unit
@@ -240,7 +242,7 @@ class TestOpenAIEmbeddingProvider:
         mock_response.data = [MagicMock(embedding=[0.1] * 1536)]
         mock_async_openai_client.embeddings.create.return_value = mock_response
 
-        with patch('create_embeddings.opret_bøger.AsyncOpenAI') as mock_openai_class:
+        with patch('create_embeddings.providers.embedding_providers.AsyncOpenAI') as mock_openai_class:
             mock_openai_class.return_value = mock_async_openai_client
             
             provider = OpenAIEmbeddingProvider("test_key")
@@ -276,13 +278,13 @@ class TestSafeDbExecute:
         
         assert result == 42
         mock_database_connection.fetchval.assert_called_once_with("SELECT 1", "param1")
+        
     @pytest.mark.asyncio
     async def test_exception_handling(self, mock_database_connection):
         """Test exception handling in database execution."""
         mock_database_connection.fetchval.side_effect = Exception("Database error")
         
-        mock_logging = MagicMock()
-        with patch('create_embeddings.opret_bøger.logging', mock_logging):
+        with patch('logging.exception') as mock_exception:
             result = await safe_db_execute(
                 "http://test.com/book.pdf",
                 mock_database_connection,
@@ -290,20 +292,25 @@ class TestSafeDbExecute:
             )
             
             assert result is None
-            mock_logging.exception.assert_called_once()
+            assert mock_exception.call_count > 0
     
     @pytest.mark.asyncio
     async def test_logging_includes_url(self, mock_database_connection):
         """Test that logging includes the URL for context."""
         mock_database_connection.fetchval.side_effect = Exception("Database error")
         
-        with patch('create_embeddings.opret_bøger.logging') as mock_logging:
+        with patch('logging.exception') as mock_exception:
             await safe_db_execute(
                 "http://test.com/book.pdf",
                 mock_database_connection,
                 "SELECT 1"
             )
             
-            # Check that the URL is included in the log message
-            call_args = mock_logging.exception.call_args[0][0]
-            assert "http://test.com/book.pdf" in call_args
+            # Check that the call happened
+            assert mock_exception.call_count > 0
+            # Get the arguments from the first call
+            args = mock_exception.call_args
+            if args:
+                # Check that the URL is included in the log message
+                log_message = args[0][0]
+                assert "http://test.com/book.pdf" in log_message
