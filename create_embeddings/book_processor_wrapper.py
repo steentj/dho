@@ -10,10 +10,7 @@ import logging
 # Add the parent directory to the Python path for absolute imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import ALL existing functionality from opret_bøger using absolute imports
-from create_embeddings.opret_bøger import (
-    indlæs_urls,
-)
+# Import shared functionality
 from create_embeddings.logging_config import setup_logging
 
 class BookProcessorWrapper:
@@ -78,7 +75,14 @@ class BookProcessorWrapper:
         if not input_file_path.exists():
             raise FileNotFoundError(f"Inputfil ikke fundet: {input_file_path}")
             
-        book_urls = indlæs_urls(str(input_file_path))
+        # Create pipeline for URL loading
+        from .book_processing_pipeline import BookProcessingPipeline
+        temp_pipeline = BookProcessingPipeline(
+            book_service=None,  # Will be set up later
+            embedding_provider=None,  # Will be set up later
+            chunking_strategy=None  # Will be set up later
+        )
+        book_urls = temp_pipeline.load_urls_from_file(str(input_file_path))
         self.total_count = len(book_urls)
         logging.info(f"Behandler {self.total_count} bøger ved hjælp af orchestrator pattern")
         

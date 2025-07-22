@@ -10,7 +10,7 @@ Last Modified date/time: 20. juli 2025, 14:30
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 import aiohttp
 import fitz  # PyMuPDF
 
@@ -28,6 +28,22 @@ class BookProcessingPipeline:
     This class coordinates the fetch → parse → save workflow for book processing,
     separating orchestration concerns from individual operations.
     """
+    
+    def load_urls_from_file(self, file_path: str) -> List[str]:
+        """
+        Load book URLs from a file.
+        
+        Args:
+            file_path: Path to the file containing URLs
+            
+        Returns:
+            List of URLs to process
+        """
+        logger.info(f"Loading URLs from {file_path}")
+        with open(file_path, "r") as file:
+            urls = [line.strip() for line in file.readlines() if line.strip()]
+        logger.info(f"Loaded {len(urls)} URLs to process")
+        return urls
     
     def __init__(
         self, 
@@ -82,17 +98,17 @@ class BookProcessingPipeline:
                 return
             
             # Fetch PDF
-            pdf = await self._fetch_pdf(book_url, session)
+            pdf = await self.fetch_pdf(book_url, session)
             if not pdf:
                 logger.warning(f"Kunne ikke hente PDF fra {book_url}")
                 return
             
             # Parse PDF and generate embeddings
             try:
-                book_data = await self._parse_pdf_to_book_data(pdf, book_url, chunk_size)
+                book_data = await self.parse_pdf_to_book_data(pdf, book_url, chunk_size)
                 
                 # Save to database
-                await self._save_book_data(book_data)
+                await self.save_book_data(book_data)
                 
                 logger.info(
                     f"{book_data['titel']} fra {book_url} er behandlet og gemt i databasen"
@@ -105,7 +121,7 @@ class BookProcessingPipeline:
             logger.exception(f"Fejl ved behandling af {book_url}: {type(e).__name__}")
             raise
     
-    async def _fetch_pdf(self, url: str, session: aiohttp.ClientSession) -> fitz.Document:
+    async def fetch_pdf(self, url: str, session: aiohttp.ClientSession) -> fitz.Document:
         """
         Fetch a PDF from a URL.
         
@@ -130,7 +146,7 @@ class BookProcessingPipeline:
             logger.error(f"Fejl ved hentning af {url}: {e}")
             return None
     
-    async def _parse_pdf_to_book_data(
+    async def parse_pdf_to_book_data(
         self, 
         pdf: fitz.Document, 
         book_url: str, 
@@ -158,7 +174,7 @@ class BookProcessingPipeline:
         }
         
         # Extract text from all pages
-        pdf_pages = self._extract_text_by_page(pdf)
+        pdf_pages = self.extract_text_by_page(pdf)
         
         # Use the chunking strategy to process the document
         for page_num, chunk_text in self.chunking_strategy.process_document(
@@ -170,7 +186,7 @@ class BookProcessingPipeline:
         
         return book
     
-    def _extract_text_by_page(self, pdf: fitz.Document) -> Dict[int, str]:
+    def extract_text_by_page(self, pdf: fitz.Document) -> Dict[int, str]:
         """
         Extract text from each page in the PDF.
         
@@ -192,7 +208,7 @@ class BookProcessingPipeline:
             )
         return pages_text
     
-    async def _save_book_data(self, book_data: Dict[str, Any]) -> None:
+    async def save_book_data(self, book_data: Dict[str, Any]) -> None:
         """
         Save book data to database.
         

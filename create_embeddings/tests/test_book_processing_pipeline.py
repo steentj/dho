@@ -2,7 +2,7 @@
 Tests for Book Processing Pipeline.
 
 Creation date/time: 20. juli 2025, 14:45
-Last Modified date/time: 20. juli 2025, 14:45
+Last Modified date/time: 22. juli 2025, 14:55
 """
 
 import pytest
@@ -149,7 +149,7 @@ async def test_pipeline_processes_new_book():
     # Mock session and fetch
     mock_session = Mock()
     
-    with patch.object(pipeline, '_fetch_pdf', return_value=mock_pdf):
+    with patch.object(pipeline, 'fetch_pdf', return_value=mock_pdf):
         await pipeline.process_book_from_url(
             "http://example.com/test.pdf",
             10,
@@ -188,7 +188,7 @@ async def test_pipeline_handles_fetch_failure():
     
     mock_session = Mock()
     
-    with patch.object(pipeline, '_fetch_pdf', return_value=None):
+    with patch.object(pipeline, 'fetch_pdf', return_value=None):
         # Should not raise exception
         await pipeline.process_book_from_url(
             "http://example.com/invalid.pdf",
@@ -229,8 +229,8 @@ async def test_pipeline_processes_valid_chunk_text():
     
     mock_session = Mock()
     
-    with patch.object(pipeline, '_fetch_pdf', return_value=mock_pdf):
-        with patch.object(pipeline, '_extract_text_by_page', return_value={1: "text1", 2: "text2"}):
+    with patch.object(pipeline, 'fetch_pdf', return_value=mock_pdf):
+        with patch.object(pipeline, 'extract_text_by_page', return_value={1: "text1", 2: "text2"}):
             await pipeline.process_book_from_url(
                 "http://example.com/test.pdf",
                 10,
@@ -262,8 +262,8 @@ async def test_pipeline_processes_exception_handling():
     
     mock_session = Mock()
     
-    # Mock _fetch_pdf to raise exception
-    with patch.object(pipeline, '_fetch_pdf', side_effect=Exception("Network error")):
+    # Mock fetch_pdf to raise exception
+    with patch.object(pipeline, 'fetch_pdf', side_effect=Exception("Network error")):
         with pytest.raises(Exception) as exc_info:
             await pipeline.process_book_from_url(
                 "http://example.com/test.pdf",

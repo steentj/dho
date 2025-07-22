@@ -139,7 +139,7 @@ async def parse_book_with_pipeline(pdf, book_url, chunk_size, embedding_provider
     )
     
     # Extract the book data using pipeline's internal method
-    book_data = await pipeline._parse_pdf_to_book_data(pdf, book_url, chunk_size)
+    book_data = await pipeline.parse_pdf_to_book_data(pdf, book_url, chunk_size)
     
     return book_data
 

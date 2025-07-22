@@ -24,17 +24,17 @@ def indlæs_urls(file_path):
 
 async def process_book(book_url, chunk_size, book_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection and pipeline pattern."""
-    from .book_processing_pipeline import BookProcessingPipeline
+    from .tests.test_utils import process_book_adapter
     
-    # Create pipeline with injected dependencies
-    pipeline = BookProcessingPipeline(
+    # Use the adapter to maintain backward compatibility
+    await process_book_adapter(
+        book_url=book_url,
+        chunk_size=chunk_size,
         book_service=book_service,
+        session=session,
         embedding_provider=embedding_provider,
         chunking_strategy=chunking_strategy
     )
-    
-    # Delegate to pipeline
-    await pipeline.process_book_from_url(book_url, chunk_size, session)
 
 async def main():
     """Hovedfunktion for at hente og behandle alle bøger using dependency injection."""

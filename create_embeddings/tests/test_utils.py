@@ -5,19 +5,41 @@ This module provides shared test utilities for transitioning from the
 standalone extract_text_by_page function to the BookProcessingPipeline._extract_text_by_page method.
 
 Creation date/time: 22. juli 2025, 10:30
-Last Modified date/time: 22. juli 2025, 10:30
+Last Modified date/time: 22. juli 2025, 12:55
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 from unittest.mock import MagicMock
 
 from create_embeddings.book_processing_pipeline import BookProcessingPipeline
 
 
+def indlæs_urls_adapter(file_path: str) -> List[str]:
+    """
+    Adapter function that provides the same interface as the old indlæs_urls
+    but delegates to BookProcessingPipeline.load_urls_from_file.
+    
+    Args:
+        file_path: Path to the file containing URLs
+        
+    Returns:
+        List of URLs to process
+    """
+    # Create a minimal pipeline instance just for URL loading
+    pipeline = BookProcessingPipeline(
+        book_service=MagicMock(),
+        embedding_provider=MagicMock(),
+        chunking_strategy=MagicMock()
+    )
+    
+    # Call the pipeline's method
+    return pipeline.load_urls_from_file(file_path)
+
+
 def extract_text_by_page_adapter(pdf) -> Dict[int, str]:
     """
     Adapter function that provides the same interface as the old extract_text_by_page
-    but delegates to BookProcessingPipeline._extract_text_by_page.
+    but delegates to BookProcessingPipeline.extract_text_by_page.
     
     This helps tests transition from using the old standalone function to the 
     new class method without breaking existing test code.
@@ -36,13 +58,13 @@ def extract_text_by_page_adapter(pdf) -> Dict[int, str]:
     )
     
     # Call the pipeline's method
-    return pipeline._extract_text_by_page(pdf)
+    return pipeline.extract_text_by_page(pdf)
 
 
 async def parse_book_adapter(pdf, book_url, chunk_size, embedding_provider, chunking_strategy) -> Dict[str, Any]:
     """
     Adapter function that provides the same interface as the old parse_book function
-    but delegates to BookProcessingPipeline._parse_pdf_to_book_data.
+    but delegates to BookProcessingPipeline.parse_pdf_to_book_data.
     
     Args:
         pdf: PDF document to parse
@@ -62,4 +84,28 @@ async def parse_book_adapter(pdf, book_url, chunk_size, embedding_provider, chun
     )
     
     # Call the pipeline's method
-    return await pipeline._parse_pdf_to_book_data(pdf, book_url, chunk_size)
+    return await pipeline.parse_pdf_to_book_data(pdf, book_url, chunk_size)
+
+
+async def process_book_adapter(book_url, chunk_size, book_service, session, embedding_provider, chunking_strategy):
+    """
+    Adapter for the old process_book function.
+    Delegates to BookProcessingPipeline.process_book_from_url.
+    
+    Args:
+        book_url: URL of the PDF to process
+        chunk_size: Maximum size for text chunks
+        book_service: Service for database operations
+        session: HTTP session for fetching PDFs
+        embedding_provider: Provider for generating embeddings
+        chunking_strategy: Strategy for text chunking
+    """
+    # Create pipeline with injected dependencies
+    pipeline = BookProcessingPipeline(
+        book_service=book_service,
+        embedding_provider=embedding_provider,
+        chunking_strategy=chunking_strategy
+    )
+    
+    # Delegate to pipeline
+    await pipeline.process_book_from_url(book_url, chunk_size, session)

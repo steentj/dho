@@ -15,13 +15,15 @@ sys.path.insert(0, str(create_embeddings_path))
 try:
     from create_embeddings.opret_bøger import (
         chunk_text, 
-        indlæs_urls,
         EmbeddingProviderFactory,
         OpenAIEmbeddingProvider,
         DummyEmbeddingProvider,
         safe_db_execute
     )
-    from create_embeddings.tests.test_utils import extract_text_by_page_adapter as extract_text_by_page
+    from create_embeddings.tests.test_utils import (
+        extract_text_by_page_adapter as extract_text_by_page,
+        indlæs_urls_adapter as indlæs_urls
+    )
 except ImportError as e:
     pytest.skip(f"Could not import from opret_bøger: {e}", allow_module_level=True)
 

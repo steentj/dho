@@ -63,7 +63,7 @@ async def save_book_with_pipeline(book, book_service, embedding_provider):
     )
     
     # Use the pipeline's internal save method
-    await pipeline._save_book_data(book)
+    await pipeline.save_book_data(book)
 
 
 class TestChunkingTypeValidation:
