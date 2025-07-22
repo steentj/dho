@@ -9,8 +9,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'create_embeddings'))
 
-from create_embeddings.opret_bøger import parse_book
 from create_embeddings.chunking import SentenceSplitterChunkingStrategy, WordOverlapChunkingStrategy
+from create_embeddings.tests.test_utils import parse_book_adapter as parse_book
 
 
 class MockEmbeddingProvider:
@@ -38,9 +38,9 @@ def create_mock_pdf(pages_content):
     def extract_text_by_page(pdf):
         return {i+1: content for i, content in enumerate(pages_content)}
     
-    # Patch the extract_text_by_page function
-    import create_embeddings.opret_bøger
-    create_embeddings.opret_bøger.extract_text_by_page = extract_text_by_page
+    # Patch the extract_text_by_page function in BookProcessingPipeline
+    import create_embeddings.book_processing_pipeline
+    create_embeddings.book_processing_pipeline.BookProcessingPipeline._extract_text_by_page = lambda self, pdf: extract_text_by_page(pdf)
     
     return mock_pdf
 

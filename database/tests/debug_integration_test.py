@@ -11,8 +11,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'create_embeddings'))
 
-from create_embeddings.opret_bøger import parse_book
 from create_embeddings.chunking import WordOverlapChunkingStrategy
+from create_embeddings.tests.test_utils import parse_book_adapter as parse_book
 import unittest.mock as mock
 
 
@@ -38,8 +38,8 @@ def create_mock_pdf(pages_content):
         return {i+1: content for i, content in enumerate(pages_content)}
     
     # Patch the function in the module where it's used
-    import create_embeddings.opret_bøger
-    create_embeddings.opret_bøger.extract_text_by_page = extract_text_by_page
+    import create_embeddings.book_processing_pipeline
+    create_embeddings.book_processing_pipeline.BookProcessingPipeline._extract_text_by_page = lambda self, pdf: extract_text_by_page(pdf)
     
     return mock_pdf
 

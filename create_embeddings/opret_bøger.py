@@ -22,21 +22,6 @@ def indlæs_urls(file_path):
         return [line.strip() for line in file.readlines() if line.strip()]
 
 
-def extract_text_by_page(pdf) -> dict:
-    """Udtræk tekst fra hver side i PDF'en."""
-    pages_text = {}
-    for page_num in range(len(pdf)):
-        text = pdf[page_num].get_text()
-        # Rens tekst for bløde linjeskift mv.
-        pages_text[page_num + 1] = (
-            text.replace(" \xad\n", "")
-            .replace("\xad\n", "")
-            .replace("-\n", "")
-            .replace("- \n", "")
-        )
-    return pages_text
-
-
 async def process_book(book_url, chunk_size, book_service, session, embedding_provider: EmbeddingProvider, chunking_strategy: ChunkingStrategy):
     """Behandl en enkelt bog fra URL til database using dependency injection and pipeline pattern."""
     from .book_processing_pipeline import BookProcessingPipeline
