@@ -1,5 +1,4 @@
 import asyncio
-import fitz  # PyMuPDF
 import os
 import logging
 import sys
@@ -21,25 +20,6 @@ def indlæs_urls(file_path):
     """Læs URL'er fra filen."""
     with open(file_path, "r") as file:
         return [line.strip() for line in file.readlines() if line.strip()]
-
-
-async def fetch_pdf(url, session) -> fitz.Document:
-    """Hent en PDF fra en URL."""
-    try:
-        async with session.get(url, timeout=30) as response:
-            if response.status == 200:
-                raw_pdf = await response.read()
-                # Retter åbningsmetoden for PyMuPDF
-                return fitz.open(stream=raw_pdf, filetype="pdf")
-            else:
-                logging.error(
-                    f"Fejl ved hentning af {url}: Statuskode {response.status}"
-                )
-                return None
-    except Exception as e:
-        # Catch all exceptions (network errors, timeouts, etc.) and handle gracefully
-        logging.error(f"Fejl ved hentning af {url}: {e}")
-        return None
 
 
 def extract_text_by_page(pdf) -> dict:
