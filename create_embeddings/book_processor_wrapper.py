@@ -56,9 +56,6 @@ class BookProcessorWrapper:
             with open(failed_file, 'w') as f:
                 json.dump(self.failed_books, f, indent=2)
     
-
-    
-
         
     async def process_books_from_file(self, input_file: str):
         """Process books using the orchestrator pattern with proper dependency injection"""
@@ -132,7 +129,6 @@ class BookProcessorWrapper:
             self.update_status("fejl")
             raise
     
-
     
     async def retry_failed_books(self):
         """Retry previously failed books"""

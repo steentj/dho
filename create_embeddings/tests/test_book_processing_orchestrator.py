@@ -163,19 +163,18 @@ class TestBookProcessingApplication:
     """Test the BookProcessingApplication class."""
     
     def test_load_urls_from_file(self, tmp_path):
-        """Test loading URLs from file."""
-        # Create temporary file with URLs
+        """Test loading URLs from file using BookProcessingPipeline static method."""
+        from create_embeddings.book_processing_pipeline import BookProcessingPipeline
         url_file = tmp_path / "test_urls.txt"
         url_file.write_text("http://example.com/book1.pdf\nhttp://example.com/book2.pdf\n\n# Comment line\n")
-        
-        urls = BookProcessingApplication.load_urls_from_file(str(url_file))
-        
+        urls = BookProcessingPipeline.load_urls_from_file(str(url_file))
         assert urls == ["http://example.com/book1.pdf", "http://example.com/book2.pdf", "# Comment line"]
-    
+
     def test_load_urls_from_file_nonexistent(self):
-        """Test loading URLs from non-existent file raises exception."""
+        """Test loading URLs from non-existent file raises exception using BookProcessingPipeline."""
+        from create_embeddings.book_processing_pipeline import BookProcessingPipeline
         with pytest.raises(FileNotFoundError):
-            BookProcessingApplication.load_urls_from_file("nonexistent.txt")
+            BookProcessingPipeline.load_urls_from_file("nonexistent.txt")
     
     @pytest.mark.asyncio
     async def test_run_book_processing_success(self, tmp_path):

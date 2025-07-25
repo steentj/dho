@@ -9,12 +9,12 @@ Creation date/time: 22. juli 2025, 10:30
 Last Modified date/time: 22. juli 2025, 16:45
 """
 
-from typing import Dict, Any, List, Iterable
+from typing import Dict, Any, List
 from unittest.mock import MagicMock
 
 from create_embeddings.book_processing_pipeline import BookProcessingPipeline
 from create_embeddings.providers.factory import EmbeddingProviderFactory
-from create_embeddings.providers.embedding_providers import OpenAIEmbeddingProvider, DummyEmbeddingProvider
+ 
 from create_embeddings.chunking import SentenceSplitterChunkingStrategy
 
 
@@ -29,15 +29,8 @@ def indlæs_urls_adapter(file_path: str) -> List[str]:
     Returns:
         List of URLs to process
     """
-    # Create a minimal pipeline instance just for URL loading
-    pipeline = BookProcessingPipeline(
-        book_service=MagicMock(),
-        embedding_provider=MagicMock(),
-        chunking_strategy=MagicMock()
-    )
-    
-    # Call the pipeline's method
-    return pipeline.load_urls_from_file(file_path)
+    # Use the static method directly
+    return BookProcessingPipeline.load_urls_from_file(file_path)
 
 
 def extract_text_by_page_adapter(pdf) -> Dict[int, str]:
@@ -177,7 +170,7 @@ async def main_adapter():
     This is a placeholder to satisfy imports in test_refactoring_4.py.
     The actual implementation delegates to BookProcessingApplication.run_book_processing.
     """
-    from create_embeddings.book_processing_orchestrator import BookProcessingApplication
+    # from create_embeddings.book_processing_orchestrator import BookProcessingApplication
     # This function is only used for import testing in test_refactoring_4.py
     # and will not be called directly
     pass

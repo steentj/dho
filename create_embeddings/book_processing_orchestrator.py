@@ -187,25 +187,7 @@ class BookProcessingApplication:
     - Orchestrator setup and execution
     """
     
-    @staticmethod
-    def load_urls_from_file(url_file_path: str) -> List[str]:
-        """
-        Load book URLs from a file.
-        
-        Args:
-            url_file_path: Path to file containing URLs (one per line)
-            
-        Returns:
-            List of valid URLs
-        """
-        try:
-            with open(url_file_path, "r") as file:
-                urls = [line.strip() for line in file.readlines() if line.strip()]
-                logger.info(f"Loaded {len(urls)} URLs from {url_file_path}")
-                return urls
-        except Exception as e:
-            logger.exception(f"Failed to load URLs from {url_file_path}: {type(e).__name__}")
-            raise
+
     
     @staticmethod
     async def run_book_processing(
@@ -234,8 +216,8 @@ class BookProcessingApplication:
         orchestrator = None
         
         try:
-            # Load book URLs
-            book_urls = BookProcessingApplication.load_urls_from_file(url_file_path)
+            # Load book URLs using BookProcessingPipeline static method
+            book_urls = BookProcessingPipeline.load_urls_from_file(url_file_path)
             
             if not book_urls:
                 logger.warning("No URLs to process")

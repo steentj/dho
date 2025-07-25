@@ -29,7 +29,8 @@ class BookProcessingPipeline:
     separating orchestration concerns from individual operations.
     """
     
-    def load_urls_from_file(self, file_path: str) -> List[str]:
+    @staticmethod
+    def load_urls_from_file(file_path: str) -> List[str]:
         """
         Load book URLs from a file.
         
