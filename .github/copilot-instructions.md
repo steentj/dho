@@ -90,7 +90,6 @@ ChunkingStrategyFactory.create_strategy("sentence_splitter|word_overlap")
 # word_overlap: 400-word chunks with 50-word overlap, no title prefix
 ```
 
-
 ## 🔒 MANDATORY DEVELOPMENT PRINCIPLES
 
 1. **Plan First**: Create development phases with clear goals
@@ -248,3 +247,13 @@ if isinstance(chunk_text, list):
 - **Root cause**: chunk_text becoming list due to environment-specific issues
 - **Solution**: Defensive type checking prevents crashes while logging incidents
 - **Tests**: See `test_defensive_fix.py` for validation coverage
+
+## Environment
+The project must be installable in 3 environment:
+1. Locally on the development Mac for quick testing
+2. On Linux in a Windows PC on the loca network. The Linux will be running in WSL here. This is for preproduction tests
+3. On a remote Linux environment for production
+
+For all 3 environment:
+- The 2 subprojects, i.e. the batch book processing project and the search program, must be able to be installed and run independently. This means that they cannot share the same .env file for environment variables.
+- The subprojects must always run in Docker

@@ -48,6 +48,13 @@ mkdir -p book_input book_output book_failed
 
 if [ "$VALIDATE_ONLY" = true ]; then
     echo "=== Validating Configuration ==="
+    # Stage 2 addition: local validation before container-based validation
+    if [ -f .env ]; then
+        echo "Running host-side validation (scripts/validate_env.py)..."
+        python3 ../scripts/validate_env.py || { echo "Host validation failed"; exit 1; }
+    else
+        echo "Warning: .env file not found in soegemaskine directory; skipping host validation" >&2
+    fi
     docker-compose run --rm book-processor --validate-config
     exit $?
 fi
@@ -99,6 +106,12 @@ elif [ -n "$INPUT_FILE" ]; then
     if [ ! -f "$INPUT_FILE" ]; then
         echo "Error: Input file not found: $INPUT_FILE"
         exit 1
+    fi
+
+    # Pre-run validation (fails fast before starting container)
+    if [ -f .env ]; then
+        echo "Validating environment before processing..."
+        python3 ../scripts/validate_env.py || { echo "Environment validation failed"; exit 1; }
     fi
     
     # Copy to docker volume
