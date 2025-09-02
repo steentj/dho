@@ -1,0 +1,40 @@
+# Stage 4: Base services (database + search API)
+# This file is combined with other overlay files for full stacks.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: dhodb
+    env_file:
+      - .env
+    volumes:
+      - ${HOME}/dhoDbData:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - dho-network
+    restart: always
+    command: ["postgres", "-c", "shared_preload_libraries=vector"]
+
+  searchapi:
+    build:
+      context: ..
+      dockerfile: soegemaskine/searchapi/Dockerfile
+    container_name: dhosearch
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - postgres
+    expose:
+      - "8000"
+    networks:
+      - dho-network
+    restart: always
+
+networks:
+  dho-network:
+    driver: bridge

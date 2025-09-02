@@ -13,6 +13,8 @@ usage() {
     echo "  -r, --retry-failed      Retry previously failed books"
     echo "  -m, --monitor          Show monitoring status"
     echo "  -v, --validate         Validate configuration" 
+    echo "  -p, --provider NAME     Override embedding provider only for this run (openai|ollama|dummy)" 
+    echo "  -M, --model MODEL       Override embedding model for this run (provider-specific)" 
     echo "  -h, --help             Show this help"
     echo ""
     echo "Input file format: One URL per line (same as existing opret_bøger.py)"
@@ -29,6 +31,8 @@ INPUT_FILE=""
 RETRY_FAILED=false
 MONITOR_ONLY=false
 VALIDATE_ONLY=false
+OVERRIDE_PROVIDER=""
+OVERRIDE_MODEL=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -36,6 +40,8 @@ while [[ $# -gt 0 ]]; do
         -r|--retry-failed) RETRY_FAILED=true; shift ;;
         -m|--monitor) MONITOR_ONLY=true; shift ;;
         -v|--validate) VALIDATE_ONLY=true; shift ;;
+        -p|--provider) OVERRIDE_PROVIDER="$2"; shift 2 ;;
+        -M|--model) OVERRIDE_MODEL="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1"; usage; exit 1 ;;
     esac
@@ -100,7 +106,26 @@ if [ "$RETRY_FAILED" = true ]; then
     fi
     
     echo "Retrying $failed_count failed books..."
-    docker-compose run --rm book-processor --retry-failed
+    # Allow provider/model overrides on retry as well
+    DOCKER_CMD=(docker-compose run --rm)
+    if [ -n "$OVERRIDE_PROVIDER" ]; then
+        case "$OVERRIDE_PROVIDER" in
+            openai|ollama|dummy) DOCKER_CMD+=( -e PROVIDER="$OVERRIDE_PROVIDER" ) ;;
+            *) echo "Error: Invalid provider override: $OVERRIDE_PROVIDER"; exit 1 ;;
+        esac
+    fi
+    if [ -n "$OVERRIDE_MODEL" ]; then
+        if [ "$OVERRIDE_PROVIDER" = "openai" ]; then
+            DOCKER_CMD+=( -e OPENAI_MODEL="$OVERRIDE_MODEL" )
+        elif [ "$OVERRIDE_PROVIDER" = "ollama" ]; then
+            DOCKER_CMD+=( -e OLLAMA_MODEL="$OVERRIDE_MODEL" )
+        else
+            DOCKER_CMD+=( -e OPENAI_MODEL="$OVERRIDE_MODEL" -e OLLAMA_MODEL="$OVERRIDE_MODEL" )
+        fi
+    fi
+    DOCKER_CMD+=( book-processor --retry-failed )
+    echo "Running: ${DOCKER_CMD[*]}"
+    "${DOCKER_CMD[@]}"
     
 elif [ -n "$INPUT_FILE" ]; then
     if [ ! -f "$INPUT_FILE" ]; then
@@ -113,6 +138,29 @@ elif [ -n "$INPUT_FILE" ]; then
         echo "Validating environment before processing..."
         python3 ../scripts/validate_env.py || { echo "Environment validation failed"; exit 1; }
     fi
+
+    # Validate provider override if provided
+    if [ -n "$OVERRIDE_PROVIDER" ]; then
+        case "$OVERRIDE_PROVIDER" in
+            openai|ollama|dummy) : ;;
+            *) echo "Error: Invalid provider override: $OVERRIDE_PROVIDER"; exit 1 ;;
+        esac
+    fi
+
+    # Show execution summary
+    echo "=== Execution Summary ==="
+    if [ -n "$OVERRIDE_PROVIDER" ]; then
+        echo "Provider override: $OVERRIDE_PROVIDER"
+    else
+        echo "Provider override: (none) - will use .env PROVIDER inside container"
+    fi
+    if [ -n "$OVERRIDE_MODEL" ]; then
+        echo "Model override: $OVERRIDE_MODEL"
+    else
+        echo "Model override: (none)"
+    fi
+    echo "Input file: $INPUT_FILE"
+    echo "=========================="
     
     # Copy to docker volume
     cp "$INPUT_FILE" book_input/
@@ -123,7 +171,25 @@ elif [ -n "$INPUT_FILE" ]; then
     echo "Using existing opret_bøger.py logic with monitoring..."
     echo ""
     
-    docker-compose run --rm book-processor --input-file "$INPUT_FILENAME"
+    # Build docker compose run command with ephemeral env overrides
+    DOCKER_CMD=(docker-compose run --rm)
+    if [ -n "$OVERRIDE_PROVIDER" ]; then
+        DOCKER_CMD+=( -e PROVIDER="$OVERRIDE_PROVIDER" )
+    fi
+    if [ -n "$OVERRIDE_MODEL" ]; then
+        # Decide which variable to set based on provider if specified, else set both openai/ollama model vars
+        if [ "$OVERRIDE_PROVIDER" = "openai" ]; then
+            DOCKER_CMD+=( -e OPENAI_MODEL="$OVERRIDE_MODEL" )
+        elif [ "$OVERRIDE_PROVIDER" = "ollama" ]; then
+            DOCKER_CMD+=( -e OLLAMA_MODEL="$OVERRIDE_MODEL" )
+        else
+            # Fallback: set both potential model variables (harmless if unused)
+            DOCKER_CMD+=( -e OPENAI_MODEL="$OVERRIDE_MODEL" -e OLLAMA_MODEL="$OVERRIDE_MODEL" )
+        fi
+    fi
+    DOCKER_CMD+=( book-processor --input-file "$INPUT_FILENAME" )
+    echo "Running: ${DOCKER_CMD[*]}"
+    "${DOCKER_CMD[@]}"
 else
     echo "Error: Either --file or --retry-failed required"
     usage

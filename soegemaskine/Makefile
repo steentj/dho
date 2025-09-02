@@ -91,3 +91,39 @@ test-pattern:
 check-deps:
 	@echo "Checking test dependencies..."
 	python -c "import pytest, pytest_asyncio, pytest_mock, pytest_cov, httpx, faker; print('All test dependencies available')"
+
+# ---------------------------------------------------------------------------
+# Stage 4 Modular Docker Compose Targets
+# ---------------------------------------------------------------------------
+
+COMPOSE_BASE=-f docker-compose.base.yml
+COMPOSE_EMBED=-f docker-compose.embeddings.yml
+COMPOSE_EDGE=-f docker-compose.edge.yml
+
+.PHONY: up-minimal up-local up-prod down-stacks compose-config ps-stacks logs-stacks
+
+up-minimal:
+	@echo "Starting minimal stack (postgres + searchapi)" 
+	docker compose $(COMPOSE_BASE) up -d
+
+up-local:
+	@echo "Starting local stack (base + embeddings services)"
+	docker compose $(COMPOSE_BASE) $(COMPOSE_EMBED) up -d
+
+up-prod:
+	@echo "Starting production stack (base + embeddings + edge)"
+	docker compose $(COMPOSE_BASE) $(COMPOSE_EMBED) $(COMPOSE_EDGE) up -d
+
+down-stacks:
+	@echo "Stopping all modular stacks"
+	docker compose $(COMPOSE_BASE) $(COMPOSE_EMBED) $(COMPOSE_EDGE) down
+
+compose-config:
+	@echo "Merged configuration (local)" 
+	docker compose $(COMPOSE_BASE) $(COMPOSE_EMBED) config
+
+ps-stacks:
+	docker compose $(COMPOSE_BASE) ps
+
+logs-stacks:
+	docker compose $(COMPOSE_BASE) logs -f

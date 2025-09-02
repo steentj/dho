@@ -1,3 +1,11 @@
+# LEGACY monolithic compose file.
+# Stage 4 introduces modular files:
+#   docker-compose.base.yml        (postgres + searchapi)
+#   docker-compose.embeddings.yml  (ollama + book-processor)
+#   docker-compose.edge.yml        (nginx)
+# Use: docker compose -f docker-compose.base.yml -f docker-compose.embeddings.yml up -d
+# This file will be retained temporarily for backward compatibility.
+
 services:
   nginx:
     image: nginx:latest

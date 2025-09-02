@@ -1,0 +1,49 @@
+# Stage 4: Embeddings-related services (Ollama + book processor)
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dho-ollama
+    volumes:
+      - ${HOME}/dhoOllamaModels:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - dho-network
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  book-processor:
+    build:
+      context: ..
+      dockerfile: create_embeddings/Dockerfile
+    container_name: dho-book-processor
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=nomic-embed-text
+    depends_on:
+      - postgres
+      - ollama
+    volumes:
+      - ./book_input:/app/input:ro
+      - ./book_output:/app/output
+      - ./book_failed:/app/failed
+    networks:
+      - dho-network
+    restart: "no"
+
+networks:
+  dho-network:
+    driver: bridge

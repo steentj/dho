@@ -1,0 +1,23 @@
+# Stage 4: Edge / ingress layer (nginx TLS termination)
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/rate_limit.conf:/etc/nginx/conf.d/rate_limit.conf
+      - /etc/letsencrypt/live/ubuntu.slaegtsbibliotek.dk/fullchain.pem:/etc/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/live/ubuntu.slaegtsbibliotek.dk/privkey.pem:/etc/ssl/privkey.pem:ro
+    ports:
+      - "443:443"
+      - "8080:80"
+    depends_on:
+      - searchapi
+    networks:
+      - dho-network
+    restart: always
+
+networks:
+  dho-network:
+    driver: bridge
