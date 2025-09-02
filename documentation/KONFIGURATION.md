@@ -4,6 +4,10 @@
 
 Dette dokument beskriver alle konfigurationsmuligheder for DHO Semantisk Søgemaskine systemet. Alle konfigurationer håndteres via miljøvariabler defineret i `.env` filen.
 
+> Drift & Miljøer: For en samlet gennemgang af multi‑miljø opsætning (local / test / production), validering, shadow search og compose overlays, se dokumentet **[Operations & Miljøer](TEKNISK/OPERATIONS_ENVIRONMENTS.md)**. Denne konfigurationsguide fokuserer på de enkelte variabler; operations‑guiden beskriver hvordan de bruges i praksis.
+
+> Legacy note: Den historiske rod-`.env` understøttes fortsat midlertidigt. Nye miljøer bør bruge filer i `env/` mappen (`env/local.env`, `env/test.env`, `env/production.env`) + validering via `./scripts/process_books.sh --validate`.
+
 ## 🔧 **Grundlæggende Opsætning**
 
 ### Kopiér Template
@@ -301,3 +305,4 @@ men PROVIDER=ollama. Disse variabler vil blive ignoreret.
 - [Installation Guide](BRUGERGUIDER/INSTALLATION.md)
 - [Chunking Strategier](TEKNISK/CHUNKING_STRATEGIER.md)
 - [Fejlfinding Guide](BRUGERGUIDER/LOKAL_UDVIKLING.md#fejlfinding)
+- [Operations & Miljøer](TEKNISK/OPERATIONS_ENVIRONMENTS.md)
