@@ -2,7 +2,7 @@
 Embedding provider implementations.
 """
 
-import os
+import os  # Kept temporarily for backward compatibility; will be removed when fully config-driven
 import json
 import asyncio
 from abc import ABC, abstractmethod
@@ -92,7 +92,7 @@ class EmbeddingProvider(ABC):
 class OpenAIEmbeddingProvider(EmbeddingProvider):
     """OpenAI embedding provider implementation."""
     
-    def __init__(self, api_key: str, model: str = None):
+    def __init__(self, api_key: str, model: str | None = None):
         """
         Initialize OpenAI embedding provider.
         
@@ -101,7 +101,8 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             model: Model to use (defaults to OPENAI_MODEL env var or text-embedding-3-small)
         """
         self.api_key = api_key
-        self.model = model or os.getenv("OPENAI_MODEL", "text-embedding-3-small")
+        # Stage 10: prefer explicit model passed by factory; retain env fallback for backward compatibility
+        self.model = model if model is not None else os.getenv("OPENAI_MODEL", "text-embedding-3-small")
         self.client = None
     
     async def initialize(self) -> None:
@@ -230,7 +231,7 @@ class DummyEmbeddingProvider(EmbeddingProvider):
 class OllamaEmbeddingProvider(EmbeddingProvider):
     """Ollama embedding provider for local models."""
     
-    def __init__(self, base_url: str = None, model: str = None):
+    def __init__(self, base_url: str | None = None, model: str | None = None):
         """
         Initialize Ollama embedding provider.
         
@@ -238,8 +239,10 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
             base_url: Ollama server URL (defaults to OLLAMA_BASE_URL env var or http://ollama:11434)
             model: Model name (defaults to OLLAMA_MODEL env var or nomic-embed-text)
         """
-        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")).rstrip('/')
-        self.model = model or os.getenv("OLLAMA_MODEL", "nomic-embed-text")
+        # Stage 10: prefer explicit params; retain env fallback for compatibility
+        resolved_base = base_url if base_url is not None else os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+        self.base_url = resolved_base.rstrip('/')
+        self.model = model if model is not None else os.getenv("OLLAMA_MODEL", "nomic-embed-text")
         self.client = None
     
     async def initialize(self) -> None:

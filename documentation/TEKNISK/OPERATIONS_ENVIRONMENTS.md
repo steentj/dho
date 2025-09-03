@@ -1,7 +1,7 @@
 # Drifts- & Miljøvejledning (Operations & Environments)
 
 Oprettet: 2025-09-02  
-Sidst Opdateret: 2025-09-03
+Sidst Opdateret: 2025-09-03 (inkl. Stage 10 delvise endpoints)
 
 ## Formål
 Én samlet, praktisk guide til at køre, vedligeholde og migrere mellem miljøer for SlægtBib semantisk søgesystem. Denne fil samler driftsrutiner, miljøskift, shadow-testing og provider-cutover.
@@ -234,6 +234,50 @@ Planlagt udbygning:
 - Providers flyttes til central config konsum.
 - Validation via Pydantic eller stricte enums.
 - Eksperimentelt live-refresh endpoint.
+
+## Admin & Konfigurations Endpoints (Stage 10 - Delvis)
+
+Nye (eksperimentelle) endpoints kræver admin aktivering og token:
+```
+GET  /configz              # Maskeret visning af nuværende konfiguration
+POST /admin/refresh-config # Genindlæser miljøvariabler ind i singleton
+```
+
+Aktivering via miljøvariabler:
+```
+ADMIN_ENABLED=true
+ADMIN_TOKEN=<hemmeligt_token>
+ADMIN_ALLOW_CONFIG_VIEW=true   # Kan sættes til false for kun at tillade refresh
+```
+
+Autentifikation:
+- Header `x-admin-token: <token>` ELLER `Authorization: Bearer <token>`.
+- Manglende eller forkert token => 401.
+- Hvis admin ikke er aktiveret => 404 (for ikke at lække eksistens af endpoints).
+
+Svar-eksempel `/configz` (uddrag):
+```
+{
+   "database": {"host": "postgres", "password": "***"},
+   "provider": {"name": "ollama", "openai_api_key": "***"},
+   "service_version": "0.0.0"
+}
+```
+
+Brugsscenarier:
+- Hurtig verifikation af loaded værdier i kørende container.
+- Just-in-time ændring af f.eks. DISTANCE_THRESHOLD uden restart (ændr env + kald refresh).
+
+Begrænsninger (midlertidige):
+- Ingen audit logging endnu.
+- Ingen granularitet (enten fuld refresh eller intet).
+- Ingen diff-visning af ændrede værdier.
+
+Plan for udbygning:
+1. Tilføj audit log (hvem / hvornår refresh).
+2. Role-baseret begrænsning (view vs refresh adskilt token eller scopes).
+3. Mulighed for selektiv reload (kun søgeparametre).
+4. `/configz/diff` endpoint (sidst vs nuværende snapshot).
 
 ---
 Feedback eller forslag: opdater denne fil med dato + ændringsnotat.

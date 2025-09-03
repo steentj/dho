@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # Central configuration
-from config.config_loader import get_config
+from config.config_loader import get_config, refresh_config
 
 # Add the src directory to Python path for imports - must be done before other imports
 src_path = Path(__file__).parent.parent.parent
@@ -70,20 +70,9 @@ async def lifespan(app: FastAPI):
     print("Opstart: Database service connected using dependency injection")
     
     # Initialize embedding provider with dependency injection
-    provider_name = _cfg.provider.name
-    api_key = _cfg.provider.openai_api_key
-    
-    # Use the appropriate model based on the provider
-    if provider_name == "ollama":
-        model = _cfg.provider.ollama_model
-    else:
-        model = _cfg.provider.openai_model
-    
-    embedding_provider = EmbeddingProviderFactory.create_provider(
-        provider_name=provider_name, 
-        api_key=api_key, 
-        model=model
-    )
+    # Config-driven provider creation (Stage 10 enhancement)
+    embedding_provider = EmbeddingProviderFactory.create_from_config(_cfg)
+    provider_name = embedding_provider.get_provider_name() if hasattr(embedding_provider, 'get_provider_name') else _cfg.provider.name
     # Inject runtime retry/timeout config if attributes exist
     for attr, value in {
         'timeout': EMBEDDING_TIMEOUT,
@@ -94,7 +83,19 @@ async def lifespan(app: FastAPI):
             setattr(embedding_provider, attr, value)
         except Exception:
             pass
-    print(f"Opstart: Embedding provider '{provider_name}' initialized with model '{model}'")
+    # Attempt to log model information if attribute present
+    model_attr = None
+    for attr_name in ("model", "openai_model", "ollama_model"):
+        if hasattr(embedding_provider, attr_name):
+            try:
+                model_attr = getattr(embedding_provider, attr_name)
+                break
+            except Exception:
+                pass
+    if model_attr:
+        print(f"Opstart: Embedding provider '{provider_name}' initialized with model '{model_attr}'")
+    else:
+        print(f"Opstart: Embedding provider '{provider_name}' initialized")
     
     yield
     
@@ -331,6 +332,28 @@ def extract_text_from_chunk(raw_chunk: str):
 def _service_version() -> str:
     return _cfg.service.version
 
+def _admin_enabled() -> bool:
+    return getattr(_cfg, 'admin', None) is not None and _cfg.admin.enabled
+
+def _admin_token() -> str | None:
+    if getattr(_cfg, 'admin', None):
+        return _cfg.admin.token
+    return None
+
+def _admin_allow_view() -> bool:
+    return getattr(_cfg, 'admin', None) and _cfg.admin.allow_config_view
+
+def _require_admin(request: Request) -> bool:
+    if not _admin_enabled():
+        return False
+    header = request.headers.get('x-admin-token') or request.headers.get('authorization')
+    expected = _admin_token()
+    if expected and header:
+        # Support raw token or Bearer <token>
+        token_val = header.replace('Bearer ', '').strip()
+        return token_val == expected
+    return False
+
 @app.get("/healthz")
 async def healthz() -> Dict[str, Any]:
     provider_name = None
@@ -399,6 +422,37 @@ async def readyz(response: Response) -> Dict[str, Any]:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         result['status'] = 'degraded'
         return result
+
+# ---------------------------------------------------------------------------
+# Stage 10: Admin / Config Introspection Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/configz")
+async def configz(request: Request, response: Response) -> Dict[str, Any]:
+    if not _admin_enabled() or not _admin_allow_view():
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {"error": "Not found"}
+    if not _require_admin(request):
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Unauthorized"}
+    safe = _cfg.to_safe_dict()
+    safe['service_version'] = _service_version()
+    return safe
+
+@app.post("/admin/refresh-config")
+async def admin_refresh_config(request: Request, response: Response) -> Dict[str, Any]:
+    if not _admin_enabled():
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {"error": "Not found"}
+    if not _require_admin(request):
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Unauthorized"}
+    global _cfg, EMBEDDING_TIMEOUT, EMBEDDING_MAX_RETRIES, EMBEDDING_RETRY_BACKOFF
+    _cfg = refresh_config()
+    EMBEDDING_TIMEOUT = _cfg.embedding.timeout
+    EMBEDDING_MAX_RETRIES = _cfg.embedding.max_retries
+    EMBEDDING_RETRY_BACKOFF = _cfg.embedding.retry_backoff
+    return {"status": "reloaded", "version": _service_version()}
 
 if __name__ == "__main__":
     import uvicorn

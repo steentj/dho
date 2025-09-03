@@ -76,6 +76,13 @@ class ServiceMeta:
 
 
 @dataclass
+class AdminConfig:
+    enabled: bool
+    token: Optional[str]
+    allow_config_view: bool
+
+
+@dataclass
 class AppConfig:
     environment: str
     database: DatabaseConfig
@@ -86,6 +93,7 @@ class AppConfig:
     logging: LoggingConfig
     cors: CORSConfig
     service: ServiceMeta
+    admin: AdminConfig
 
     def to_safe_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -148,6 +156,13 @@ def load_config(env: Optional[Dict[str, str]] = None) -> AppConfig:
     cors_cfg = CORSConfig(allowed_origins=_split_csv(e.get("TILLADTE_KALDERE", "")))
     service_meta = ServiceMeta(version=e.get("SERVICE_VERSION", "0.0.0"))
 
+    # Admin (Stage 10)
+    admin_cfg = AdminConfig(
+        enabled=e.get("ADMIN_ENABLED", "false").lower() in {"1", "true", "yes"},
+        token=e.get("ADMIN_TOKEN"),
+        allow_config_view=e.get("ADMIN_ALLOW_CONFIG_VIEW", "true").lower() in {"1", "true", "yes"},
+    )
+
     return AppConfig(
         environment=environment,
         database=db_cfg,
@@ -157,7 +172,8 @@ def load_config(env: Optional[Dict[str, str]] = None) -> AppConfig:
         chunking=chunking_cfg,
         logging=logging_cfg,
         cors=cors_cfg,
-        service=service_meta,
+    service=service_meta,
+    admin=admin_cfg,
     )
 
 

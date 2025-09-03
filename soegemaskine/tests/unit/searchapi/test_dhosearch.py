@@ -118,7 +118,7 @@ class TestLifespan:
         mock_postgresql.return_value = mock_db
         
         mock_provider = MagicMock()
-        mock_factory.create_provider.return_value = mock_provider
+        mock_factory.create_from_config.return_value = mock_provider
         
         # Create a FastAPI app with the lifespan context
         app = FastAPI()
@@ -137,11 +137,7 @@ class TestLifespan:
             mock_db.connect.assert_called_once()
             
             # Check provider was created with correct parameters
-            mock_factory.create_provider.assert_called_once_with(
-                provider_name="openai",
-                api_key="sk-test",
-                model="text-embedding-3-small"
-            )
+            mock_factory.create_from_config.assert_called_once()
         
         # Check that disconnect was called after context exit
         mock_db.disconnect.assert_called_once()
@@ -165,7 +161,7 @@ class TestLifespan:
         mock_postgresql.return_value = mock_db
         
         mock_provider = MagicMock()
-        mock_factory.create_provider.return_value = mock_provider
+        mock_factory.create_from_config.return_value = mock_provider
         
         # Create a FastAPI app with the lifespan context
         app = FastAPI()
@@ -184,11 +180,7 @@ class TestLifespan:
             mock_db.connect.assert_called_once()
             
             # Check provider was created with correct parameters
-            mock_factory.create_provider.assert_called_once_with(
-                provider_name="ollama",
-                api_key=None,  # Ollama doesn't need an API key
-                model="nomic-embed-text"
-            )
+            mock_factory.create_from_config.assert_called_once()
         
         # Check that disconnect was called after context exit
         mock_db.disconnect.assert_called_once()

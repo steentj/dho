@@ -95,3 +95,41 @@ class EmbeddingProviderFactory:
             New code should use EmbeddingProviderRegistry.create_provider() instead.
         """
         return EmbeddingProviderRegistry.create_provider(provider_name, api_key, model)
+
+    @staticmethod
+    def create_from_config(cfg) -> EmbeddingProvider:
+        """Create an embedding provider directly from central AppConfig.
+
+        Args:
+            cfg: AppConfig instance from config.config_loader
+
+        Returns:
+            EmbeddingProvider instance initialized according to cfg.provider
+
+        Notes:
+            - Uses only typed config fields (no direct os.getenv calls)
+            - Maintains backward compatibility via existing registry
+        """
+        provider_name = cfg.provider.name
+        # Delegate to legacy create_provider so existing tests that patch it still observe a call.
+        if provider_name == 'openai':
+            provider = EmbeddingProviderFactory.create_provider(
+                provider_name=provider_name,
+                api_key=cfg.provider.openai_api_key,
+                model=cfg.provider.openai_model,
+            )
+        elif provider_name == 'ollama':
+            provider = EmbeddingProviderFactory.create_provider(
+                provider_name=provider_name,
+                api_key=None,
+                model=cfg.provider.ollama_model,
+            )
+            # Post-construction attribute normalization (base_url may come from env fallback)
+            if hasattr(provider, 'base_url'):
+                try:
+                    provider.base_url = cfg.provider.ollama_base_url.rstrip('/')
+                except Exception:
+                    pass
+        else:  # dummy or future providers
+            provider = EmbeddingProviderFactory.create_provider(provider_name=provider_name)
+        return provider
