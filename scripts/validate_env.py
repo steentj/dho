@@ -27,7 +27,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warning"
@@ -148,6 +148,53 @@ def gather_issues(env: Dict[str,str], strict: bool) -> Tuple[List[ValidationIssu
     return errors, warnings
 
 
+def validate_env_file(env_path: Path, *, strict: bool = False, json_output: bool = False) -> Dict[str, Any]:
+    """Programmatic API for validation.
+
+    Returns a dict with keys:
+        file: path string
+        errors: list[{message, severity}]
+        warnings: list[{message, severity}]
+        status: ok|fail
+        assumed_environment: set when transitional fallback applied
+    """
+    env_data = load_env_file(env_path)
+    errors, warnings = gather_issues(env_data, strict)
+
+    assumed_environment = None
+    # Transitional fallback: missing ENVIRONMENT in legacy root .env
+    if env_path.name == '.env' and 'ENVIRONMENT' not in env_data:
+        missing_env_err = None
+        for e in errors:
+            if e.message == 'Missing ENVIRONMENT variable':
+                missing_env_err = e
+                break
+        if missing_env_err and not strict:
+            errors.remove(missing_env_err)
+            warnings.append(ValidationIssue(
+                'ENVIRONMENT missing in root .env -> assuming ENVIRONMENT=local (transitional fallback)',
+                SEVERITY_WARN
+            ))
+            env_data['ENVIRONMENT'] = 'local'
+            assumed_environment = 'local'
+
+    exit_code = 0
+    if errors:
+        exit_code = 1
+    elif strict and warnings:
+        exit_code = 1
+
+    result = {
+        "file": str(env_path),
+        "errors": [e.to_dict() for e in errors],
+        "warnings": [w.to_dict() for w in warnings],
+        "status": "ok" if exit_code == 0 else "fail",
+    }
+    if assumed_environment:
+        result["assumed_environment"] = assumed_environment
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate environment configuration")
     parser.add_argument('--file', '-f', help='Path to env file (default ./.env)')
@@ -156,53 +203,25 @@ def main():
     args = parser.parse_args()
 
     env_path = Path(args.file) if args.file else Path('.env')
-
     try:
-        env_data = load_env_file(env_path)
-        errors, warnings = gather_issues(env_data, args.strict)
-
-        # Transitional fallback: missing ENVIRONMENT in legacy root .env
-        if not args.file and 'ENVIRONMENT' not in env_data:
-            # Look for the specific error and downgrade if not strict
-            missing_env_err = None
-            for e in errors:
-                if e.message == 'Missing ENVIRONMENT variable':
-                    missing_env_err = e
-                    break
-            if missing_env_err and not args.strict:
-                # Downgrade to warning
-                errors.remove(missing_env_err)
-                warnings.append(ValidationIssue(
-                    'ENVIRONMENT missing in root .env -> assuming ENVIRONMENT=local (transitional fallback)',
-                    SEVERITY_WARN
-                ))
-                env_data['ENVIRONMENT'] = 'local'
-        exit_code = 0
-        if errors:
-            exit_code = 1
-        elif args.strict and warnings:
-            exit_code = 1
+        result = validate_env_file(env_path, strict=args.strict, json_output=args.json)
+        exit_code = 0 if result["status"] == "ok" else 1
 
         if args.json:
-            print(json.dumps({
-                "file": str(env_path),
-                "errors": [e.to_dict() for e in errors],
-                "warnings": [w.to_dict() for w in warnings],
-                "status": "ok" if exit_code == 0 else "fail"
-            }, indent=2))
+            print(json.dumps(result, indent=2))
         else:
-            print(f"Validating: {env_path}")
-            if errors:
+            print(f"Validating: {result['file']}")
+            if result['errors']:
                 print("Errors:")
-                for e in errors:
-                    print(f"  - {e.message}")
-            if warnings:
+                for e in result['errors']:
+                    print(f"  - {e['message']}")
+            if result['warnings']:
                 print("Warnings:")
-                for w in warnings:
-                    print(f"  - {w.message}")
-            if not errors and not warnings:
+                for w in result['warnings']:
+                    print(f"  - {w['message']}")
+            if not result['errors'] and not result['warnings']:
                 print("No issues detected.")
-            elif not errors and warnings:
+            elif not result['errors'] and result['warnings']:
                 print("Validation passed with warnings.")
         sys.exit(exit_code)
     except FileNotFoundError as e:

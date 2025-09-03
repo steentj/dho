@@ -37,6 +37,7 @@ Fremtidig forbedring: `env_switch.sh` (kommende mulighed) til at undgå manuel k
 ```
 python scripts/validate_env.py            # Validerer ./.env
 python scripts/validate_env.py --file env/test.env --strict
+make -C soegemaskine validate-env         # Make target (JSON output)
 ```
 Fejl skal rettes før deploy. Warnings kan tolereres i local men ikke i production (brug `--strict`).
 

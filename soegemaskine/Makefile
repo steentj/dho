@@ -14,6 +14,7 @@ help:
 	@echo "  format           Format code with black"
 	@echo "  clean            Clean up generated files"
 	@echo "  docker-test      Run tests in Docker environment"
+	@echo "  validate-env     Validate current .env (root)"
 
 # Install development dependencies
 install:
@@ -70,6 +71,11 @@ clean:
 docker-test:
 	@echo "Running tests in Docker..."
 	docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+
+# Validate environment configuration (root .env)
+validate-env:
+	@echo "Validating root .env ..."
+	python ../scripts/validate_env.py --json || true
 
 # Setup test database (if needed)
 setup-test-db:
