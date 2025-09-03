@@ -15,6 +15,7 @@ help:
 	@echo "  clean            Clean up generated files"
 	@echo "  docker-test      Run tests in Docker environment"
 	@echo "  validate-env     Validate current .env (root)"
+	@echo "  health-check     Curl /healthz and /readyz endpoints"
 
 # Install development dependencies
 install:
@@ -76,6 +77,11 @@ docker-test:
 validate-env:
 	@echo "Validating root .env ..."
 	python ../scripts/validate_env.py --json || true
+
+# Health checks (requires stack running)
+health-check:
+	@echo "GET /healthz" && curl -s http://localhost:8080/healthz | python -m json.tool || true
+	@echo "GET /readyz" && curl -s -o /dev/stderr -w "\nHTTP:%{http_code}\n" http://localhost:8080/readyz || true
 
 # Setup test database (if needed)
 setup-test-db:

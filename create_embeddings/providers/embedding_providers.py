@@ -4,6 +4,7 @@ Embedding provider implementations.
 
 import os
 import json
+import asyncio
 from abc import ABC, abstractmethod
 from typing import List
 from openai import AsyncOpenAI
@@ -115,19 +116,27 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             self.client = None
 
     async def get_embedding(self, chunk: str) -> list:
-        """
-        Generate embedding using OpenAI API.
-        
-        Args:
-            chunk: Text to generate embedding for
-            
-        Returns:
-            List of floats representing the embedding vector
-        """
-        # Ensure client is initialized
+        """Generate embedding using OpenAI API with retry/timeout (Stage 8)."""
         if self.client is None:
             await self.initialize()
-        
+
+        timeout = getattr(self, 'timeout', 30)
+        max_retries = getattr(self, 'max_retries', 1)
+        backoff = getattr(self, 'retry_backoff', 0.5)
+        attempt = 0
+        last_error = None
+        while attempt <= max_retries:
+            try:
+                return await asyncio.wait_for(self._call_openai(chunk), timeout=timeout)
+            except Exception as e:  # Broad catch; we can refine if needed
+                last_error = e
+                if attempt == max_retries:
+                    break
+                await asyncio.sleep(backoff * (2 ** attempt))
+                attempt += 1
+        raise RuntimeError(f"OpenAI embedding failed after {attempt+1} attempt(s): {last_error}")
+
+    async def _call_openai(self, chunk: str):
         response = await self.client.embeddings.create(input=chunk, model=self.model)
         return response.data[0].embedding
     
@@ -245,22 +254,27 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
             self.client = None
 
     async def get_embedding(self, chunk: str) -> List[float]:
-        """
-        Generate embedding using Ollama API.
-        
-        Args:
-            chunk: Text to generate embedding for
-            
-        Returns:
-            List of floats representing the embedding vector
-            
-        Raises:
-            RuntimeError: If the Ollama API request fails
-        """
-        # Ensure client is initialized
+        """Generate embedding using Ollama API with retry/timeout (Stage 8)."""
         if self.client is None:
             await self.initialize()
-        
+
+        timeout = getattr(self, 'timeout', 30)
+        max_retries = getattr(self, 'max_retries', 1)
+        backoff = getattr(self, 'retry_backoff', 0.5)
+        attempt = 0
+        last_error = None
+        while attempt <= max_retries:
+            try:
+                return await asyncio.wait_for(self._call_ollama(chunk), timeout=timeout)
+            except Exception as e:
+                last_error = e
+                if attempt == max_retries:
+                    break
+                await asyncio.sleep(backoff * (2 ** attempt))
+                attempt += 1
+        raise RuntimeError(f"Ollama embedding failed after {attempt+1} attempt(s): {last_error}")
+
+    async def _call_ollama(self, chunk: str) -> List[float]:
         try:
             response = await self.client.post(
                 f"{self.base_url}/api/embeddings",
@@ -269,21 +283,13 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
                     "prompt": chunk
                 }
             )
-            
-            # Only call raise_for_status if it's not a mock (to avoid async mock warnings)
             if not hasattr(response.raise_for_status, '_mock_name'):
                 response.raise_for_status()
-            
-            # Handle both awaitable and non-awaitable response.json()
-            # This defensive approach handles different httpx versions or response types
             json_result = response.json()
             if hasattr(json_result, '__await__') and not hasattr(json_result, '_mock_name'):
-                # It's a real coroutine (not a mock), await it
                 result = await json_result
             else:
-                # It's already a dict or it's a mock
                 result = json_result
-                
             return result["embedding"]
         except httpx.HTTPStatusError as e:
             raise RuntimeError(f"Ollama embedding request failed: HTTP error: {e}")

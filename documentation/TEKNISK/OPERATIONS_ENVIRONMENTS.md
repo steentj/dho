@@ -1,7 +1,7 @@
 # Drifts- & Miljøvejledning (Operations & Environments)
 
 Oprettet: 2025-09-02  
-Sidst Opdateret: 2025-09-02
+Sidst Opdateret: 2025-09-03
 
 ## Formål
 Én samlet, praktisk guide til at køre, vedligeholde og migrere mellem miljøer for SlægtBib semantisk søgesystem. Denne fil samler driftsrutiner, miljøskift, shadow-testing og provider-cutover.
@@ -40,6 +40,44 @@ python scripts/validate_env.py --file env/test.env --strict
 make -C soegemaskine validate-env         # Make target (JSON output)
 ```
 Fejl skal rettes før deploy. Warnings kan tolereres i local men ikke i production (brug `--strict`).
+
+## Health & Readiness (Stage 8)
+Endpoints (kører på port 8080 via searchapi container):
+```
+GET /healthz   # Liveness (ingen DB eller eksterne kald)
+GET /readyz    # Readiness (DB + provider check)
+```
+Eksempel:
+```
+make -C soegemaskine health-check
+```
+`/readyz` strategi:
+- dummy: altid OK
+- openai: antages OK (undgår betalte micro-kald) => felt `assumed_provider_ready=true`
+- ollama: lille embedding på "ping" med kort timeout (<=5s)
+
+Statuskoder:
+- 200 OK: { status: "ok" }
+- 503 Service Unavailable: { status: "degraded" }
+
+## Embedding Timeout & Retries
+Nye miljøvariabler:
+```
+EMBEDDING_TIMEOUT=30          # Sekunder pr. kald
+EMBEDDING_MAX_RETRIES=1       # Antal retry forsøg (ekskl. første)
+EMBEDDING_RETRY_BACKOFF=0.5   # Grund-backoff i sekunder (eksponentiel)
+```
+Anvendelse:
+- Ollama & OpenAI providers respekterer disse værdier.
+- Retry kun på generelle fejl/undtagelser (forfining mulig i senere stage).
+
+## Ressource Limits (Compose)
+Tilføjet i `docker-compose.base.yml`:
+```
+postgres: limits memory 1g (reservation 256m)
+searchapi: limits memory 512m (reservation 128m)
+```
+Formål: Forebyggende mod runaway memory. Justér ved tunings-behov.
 
 ## Docker Compose Layout (Modulært)
 | Fil | Indhold |
@@ -134,6 +172,68 @@ Fuld strategi bør inkludere versionsstemplede off-site kopier.
 - CI gate på overlap rapport (shadow) før provider cutover.
 - JSON log parsing pipeline.
 - Per-provider health endpoint.
+- Dynamisk reload af konfiguration uden restart (planlagt efter Stage 9).
+
+## Central Konfiguration (Stage 9)
+
+Stage 9 introducerer et centralt konfigurationsmodul: `config/config_loader.py`.
+Formål: Erstatte spredte `os.getenv` kald med et typed objekt (`AppConfig`) for bedre vedligehold, testbarhed og konsistens.
+
+Nøglebrug:
+```
+from config.config_loader import get_config
+cfg = get_config()
+print(cfg.provider.name)
+```
+
+Struktur (uddrag):
+```
+AppConfig
+   .provider.name            # openai | ollama | dummy
+   .provider.openai_model
+   .provider.ollama_model
+   .embedding.timeout
+   .embedding.max_retries
+   .embedding.retry_backoff
+   .search.distance_threshold
+   .cors.allowed_origins
+   .service.version
+```
+
+Singleton & Refresh:
+```
+from config.config_loader import refresh_config
+refresh_config()  # Genindlæser miljøvariabler (bruges ved app startup)
+```
+
+Sikker Maskering:
+```
+cfg.to_safe_dict()  # Returnerer dict med maskerede secrets
+```
+
+Migreringsstrategi (inkrementel):
+1. Kritisk API (`dhosearch.py`) migreret først.
+2. Øvrige moduler (providers, book processing) migreres senere for at minimere regressions.
+3. Ny kode bør undgå direkte `os.getenv`.
+
+Health-check (`make health-check`) uændret – endpoints bruger nu central config men API kontrakten er identisk.
+
+Fordele:
+- Ensartet parsing af tal/float defaults.
+- Tidlig validering af provider (fail-fast).
+- Testbarhed (kan injicere dict i `load_config`).
+- Forbereder dynamisk reload og evt. admin endpoint.
+
+Begrænsninger midlertidigt:
+- Kun distance-threshold + provider/embedding runtime anvendt aktivt i search API indtil fuld adoption.
+
+Testdækning:
+- `tests/test_config_loader.py` dækker defaults, invalid provider, parsing, singleton cache og masking.
+
+Planlagt udbygning:
+- Providers flyttes til central config konsum.
+- Validation via Pydantic eller stricte enums.
+- Eksperimentelt live-refresh endpoint.
 
 ---
 Feedback eller forslag: opdater denne fil med dato + ændringsnotat.

@@ -15,6 +15,12 @@ services:
       - dho-network
     restart: always
     command: ["postgres", "-c", "shared_preload_libraries=vector"]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+        reservations:
+          memory: 256m
 
   searchapi:
     build:
@@ -34,6 +40,12 @@ services:
     networks:
       - dho-network
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 128m
 
 networks:
   dho-network:

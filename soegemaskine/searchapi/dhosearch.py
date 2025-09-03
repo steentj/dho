@@ -1,13 +1,16 @@
-import os
+import os  # noqa: F401 (bevaret for test-mocking kompatibilitet)
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
+# Central configuration
+from config.config_loader import get_config
 
 # Add the src directory to Python path for imports - must be done before other imports
 src_path = Path(__file__).parent.parent.parent
@@ -43,32 +46,54 @@ class SearchResponse(BaseModel):
 db_service = None
 embedding_provider = None
 
+# Stage 8: Embedding timeout / retry configuration
+# Read once via config object (lazy loaded)
+_cfg = get_config()
+EMBEDDING_TIMEOUT = _cfg.embedding.timeout
+EMBEDDING_MAX_RETRIES = _cfg.embedding.max_retries
+EMBEDDING_RETRY_BACKOFF = _cfg.embedding.retry_backoff
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager using dependency injection."""
     global db_service, embedding_provider
     
     # Initialize PostgreSQL service with dependency injection
-    database_url = os.getenv("DATABASE_URL", None)
+    # Refresh config at startup (ensures values from current process env)
+    from config.config_loader import refresh_config
+    global _cfg
+    _cfg = refresh_config()
+
+    database_url = _cfg.database.url
     db_service = PostgreSQLService(database_url)
     await db_service.connect()
     print("Opstart: Database service connected using dependency injection")
     
     # Initialize embedding provider with dependency injection
-    provider_name = os.getenv("PROVIDER", "openai")
-    api_key = os.getenv("OPENAI_API_KEY")
+    provider_name = _cfg.provider.name
+    api_key = _cfg.provider.openai_api_key
     
     # Use the appropriate model based on the provider
     if provider_name == "ollama":
-        model = os.getenv("OLLAMA_MODEL", "nomic-embed-text")
+        model = _cfg.provider.ollama_model
     else:
-        model = os.getenv("OPENAI_MODEL", "text-embedding-3-small")
+        model = _cfg.provider.openai_model
     
     embedding_provider = EmbeddingProviderFactory.create_provider(
         provider_name=provider_name, 
         api_key=api_key, 
         model=model
     )
+    # Inject runtime retry/timeout config if attributes exist
+    for attr, value in {
+        'timeout': EMBEDDING_TIMEOUT,
+        'max_retries': EMBEDDING_MAX_RETRIES,
+        'retry_backoff': EMBEDDING_RETRY_BACKOFF,
+    }.items():
+        try:
+            setattr(embedding_provider, attr, value)
+        except Exception:
+            pass
     print(f"Opstart: Embedding provider '{provider_name}' initialized with model '{model}'")
     
     yield
@@ -92,7 +117,7 @@ async def log_origin_and_enforce_https(request: Request, call_next):
     return response
 
 # Allow CORS for all origins (for testing purposes). You can specify more secure settings later.
-tilladte_oprindelse_urler = os.getenv("TILLADTE_KALDERE", "").split(",")
+tilladte_oprindelse_urler = _cfg.cors.allowed_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[url for url in tilladte_oprindelse_urler if url],  # Kan specificeres til specifikke URL'er for mere sikkerhed
@@ -234,8 +259,18 @@ async def find_nærmeste(vektor: list) -> list:
         List of search results from database as tuples
     """
     try:
-        # Get distance threshold from environment variable
-        distance_threshold = float(os.getenv("DISTANCE_THRESHOLD", "0.5"))
+        # Stage 9: Use central config for distance threshold, but maintain
+        # backward-compatible support for tests that patch os.getenv / os.environ
+        # at runtime to influence DISTANCE_THRESHOLD. If an env override is
+        # present, prefer it without forcing full config refresh.
+        env_override = os.getenv("DISTANCE_THRESHOLD")
+        if env_override is not None:
+            try:
+                distance_threshold = float(env_override)
+            except ValueError:
+                distance_threshold = _cfg.search.distance_threshold
+        else:
+            distance_threshold = _cfg.search.distance_threshold
         
         # Get the provider name from the global embedding provider
         # This ensures search uses the same provider's table as the query embedding
@@ -288,6 +323,82 @@ def extract_text_from_chunk(raw_chunk: str):
     else:
         text = parts[0]  # No markers, return the original text
     return text
+
+# ---------------------------------------------------------------------------
+# Stage 8: Health & Readiness Endpoints
+# ---------------------------------------------------------------------------
+
+def _service_version() -> str:
+    return _cfg.service.version
+
+@app.get("/healthz")
+async def healthz() -> Dict[str, Any]:
+    provider_name = None
+    if embedding_provider and hasattr(embedding_provider, 'get_provider_name'):
+        try:
+            provider_name = embedding_provider.get_provider_name()
+        except Exception:
+            provider_name = None
+    return {
+        'status': 'ok',
+        'service': 'searchapi',
+        'provider': provider_name,
+        'version': _service_version(),
+    }
+
+@app.get("/readyz")
+async def readyz(response: Response) -> Dict[str, Any]:
+    result: Dict[str, Any] = {'service': 'searchapi', 'version': _service_version()}
+    db_ok = False
+    provider_ok = False
+    assumed_provider = False
+
+    # DB check
+    try:
+        if db_service:
+            val = await db_service.fetchval("SELECT 1")
+            if val == 1:
+                db_ok = True
+    except Exception as e:
+        result['db_error'] = str(e)
+
+    # Provider check
+    try:
+        if embedding_provider and hasattr(embedding_provider, 'get_provider_name'):
+            pname = embedding_provider.get_provider_name()
+            result['provider_name'] = pname
+            if pname == 'dummy':
+                provider_ok = True
+            elif pname == 'openai':
+                provider_ok = True
+                assumed_provider = True  # skip paid probe
+            else:  # ollama or others
+                test_text = 'ping'
+                original_timeout = getattr(embedding_provider, 'timeout', None)
+                short_timeout = min(5.0, EMBEDDING_TIMEOUT)
+                try:
+                    if original_timeout is not None:
+                        setattr(embedding_provider, 'timeout', short_timeout)
+                    _ = await embedding_provider.get_embedding(test_text)
+                    provider_ok = True
+                finally:
+                    if original_timeout is not None:
+                        setattr(embedding_provider, 'timeout', original_timeout)
+    except Exception as e:
+        result['provider_error'] = str(e)
+
+    result['db'] = 'ok' if db_ok else 'fail'
+    result['provider'] = 'ok' if provider_ok else 'fail'
+    if assumed_provider:
+        result['assumed_provider_ready'] = True
+
+    if db_ok and provider_ok:
+        result['status'] = 'ok'
+        return result
+    else:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        result['status'] = 'degraded'
+        return result
 
 if __name__ == "__main__":
     import uvicorn
