@@ -1,17 +1,45 @@
-# Semantisk søgning i Danskernes Historie Online (Slægtsbiblioteket) - Proof of Concept
+# Semantisk Søgning (Slægtsbiblioteket) – Oversigt
 
-Dette repository indeholder de Python programmer, der skal bruges for at undersøge om det er muligt og ønskeligt at udvide 
-søgemulighederne i Slægtsbiblioteket med en AI drevet semantisk søgning. 
+Kort projektbeskrivelse: Systemet muliggør semantisk søgning i danske historiske PDF-kilder via embeddings i PostgreSQL (pgvector). To hoveddele: batch bogprocessering (indtager, chunker, embedder) og transaktionel søge-API (FastAPI) med valgfri embedding provider (OpenAI, Ollama, dummy til tests).
 
-Filerne er organiseret i 2 foldere:
+## Kodeoversigt
+- `create_embeddings/` – Bogprocessering pipeline & orkestrering
+- `soegemaskine/` – Søge-API (FastAPI) + konfigurationssystem
+- `api_testgui/` – Lokal Streamlit testklient
+- `database/` – DB services og repositories
+- `config/` – Central konfiguration (Stage 9+10)
+- `documentation/` – Struktureret dokumentationssæt (CORE, REFERENCER, ARKIV)
 
-- __create_embeddings__: Indeholder det batch-script, der:
-  - indlæser bøger fra Slægtsbiblioteket
-  - opdeler teksten i chunks
-  - laver embeddings med OpenAI api for chunks
-  - gemmer i Postgres database 
-- __soegemaskine__: Webside til søgning
-  - Lader brugeren indtaste søgning og finder de semantisk bedste resultater
-  - soegemaskinen opsættes i 3 Docker containers.
+## Hurtig Kom-i-Gang
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r create_embeddings/requirements.txt
+docker compose up --build
+```
 
-Under soegemaskine ligger en folder __dokumentation__ med en yderligere information  
+## Centrale Dokumenter
+Se fuldt indeks i `documentation/INDEX.md`.
+
+| Dokument | Formål |
+|----------|-------|
+| 01_ARKITEKTUR | Systemoverblik |
+| 02_UDVIKLERGUIDE | Arbejdsgange & tests |
+| 03_DEPLOYMENT | Udrulning lokal/WSL/produktion |
+| 04_BOG_PROCESSERING | Tilføjelse af nye bøger |
+| 05_SOEGE_API_GUIDE | Brug af søge-API |
+| ENV_KONFIGURATION | Miljøvariabler & .env strategi |
+| PROVIDER_OVERSIGT | Embedding / chunking / DB providers |
+| CHUNKING_STRATEGIER | Strategidetaljer |
+| ARKIV_INDEX | Historiske rapporter |
+
+## Nøgleprincipper
+- Dependency Injection & udskiftelige providers
+- Testisolering med mock af `load_dotenv` + `patch.dict(clear=True)`
+- Fail-fast i udvikling, robust batchkørsel (fortsætter ved enkelte fejl)
+
+## Licens & Bidrag
+Internt projekt (ingen offentlig licens defineret). Bidrag gennem Pull Requests med opdateret dokumentation hvor relevant.
+
+## Support
+Se `02_UDVIKLERGUIDE` og `03_DEPLOYMENT` for fejlfinding. Arkivrapporter findes i `documentation/ARKIV/`.
+
