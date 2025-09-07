@@ -1,9 +1,11 @@
 # Installationsvejledning
 
-_Skal opdateres - 26-06-2025_
+> DEPRECATED (Windows/WSL): Windows/WSL preproduction installations er ikke længere understøttet. Brug macOS (lokal) eller Linux (produktion/staging). Følg de opdaterede vejledninger i `documentation/CORE/03_DEPLOYMENT.md` og `documentation/BRUGERGUIDER/INSTALLATION.md`.
+
+_Skal opdateres - 26-06-2025_ (Bemærk: Windows/WSL er udfaset)
 
 For at installere denne soegemaskine skal der laves en del fodarbejde.
-1. Postgresql installeres og køres i Docker. Så Docker skal installeres. Dette kræver så tilsyneladende også WSL (Windows Subsystem for Linux) kører.
+1. Postgresql installeres og køres i Docker. (Windows/WSL vejledning udfaset; se macOS/Linux vejledninger.)
 1. Der skal installeres pgAdmin, som er det grafiske Postgres administrationsværktøj.<br>
 Pkt. 1 - 2 laves af scriptet _InstallerDatabase.ps1_.
 1. Start af Docker laves i Docker Desktop

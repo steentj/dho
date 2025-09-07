@@ -24,7 +24,7 @@ Se fuldt indeks i `documentation/INDEX.md`.
 |----------|-------|
 | 01_ARKITEKTUR | Systemoverblik |
 | 02_UDVIKLERGUIDE | Arbejdsgange & tests |
-| 03_DEPLOYMENT | Udrulning lokal/WSL/produktion |
+| 03_DEPLOYMENT | Udrulning lokal/produktion |
 | 04_BOG_PROCESSERING | Tilføjelse af nye bøger |
 | 05_SOEGE_API_GUIDE | Brug af søge-API |
 | ENV_KONFIGURATION | Miljøvariabler & .env strategi |

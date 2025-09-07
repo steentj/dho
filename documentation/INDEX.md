@@ -10,7 +10,7 @@ Formål: Hurtigt overblik over dokumentationssættet
 ## CORE
 - 01_ARKITEKTUR.md – Overblik over systemarkitektur
 - 02_UDVIKLERGUIDE.md – Arbejdsgange, test og kvalitet
-- 03_DEPLOYMENT.md – Udrulning lokalt, WSL og produktion
+- 03_DEPLOYMENT.md – Udrulning lokalt og produktion (staging på Linux er muligt)
 - 04_BOG_PROCESSERING.md – Indlæsning og behandling af bøger
 - 05_SOEGE_API_GUIDE.md – Anvendelse af søge-API
 

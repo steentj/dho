@@ -6,13 +6,12 @@ Ejerskab: Driftansvarlig
 Formål: Sikre reproducerbar manuel udrulning i tre miljøer
 
 # 1. Scope
-Dækker lokal udvikling, WSL preprod og produktion på fjern Linux. Ingen automatiseret CI/CD.
+Dækker lokal udvikling og produktion på fjern Linux. Ingen automatiseret CI/CD.
 
 # 2. Miljøtyper
 | Miljø | Formål | Kendetegn |
 |-------|--------|-----------|
 | Lokal (Mac) | Udvikling & hurtig test | venv + Docker Compose |
-| WSL (LAN) | Preprod / accept | WSL2 Ubuntu, delt netværk |
 | Produktion | Endelig drift | Hardened Linux, backup, overvågning |
 
 # 3. Forudsætninger
@@ -23,33 +22,46 @@ Dækker lokal udvikling, WSL preprod og produktion på fjern Linux. Ingen automa
 
 Eksterne kilder:
 - Docker: https://docs.docker.com/
-- WSL: https://learn.microsoft.com/windows/wsl/
 - SSH nøgle: https://www.ssh.com/academy/ssh/keygen
 
 # 4. Lokal Opsætning
 1. Klon repo
 2. Opret `.env` filer fra `.env.template` i relevante kataloger
-3. Byg & start services:
+3. Validér konfiguration:
+```bash
+python scripts/validate_env.py
 ```
-docker compose up --build
+4. Byg & start services med embedding profil:
+```bash
+cd soegemaskine
+docker-compose --profile embeddings up --build -d
 ```
-4. Kør tests:
+5. Opsæt Ollama, hvis dette bruges som provider:
+```bash
+../scripts/setup_ollama.sh
 ```
+6. Kør tests:
+```bash
 python -m venv .venv && source .venv/bin/activate
 python -m pip install -r create_embeddings/requirements.txt
 python -m pytest
 ```
 
-# 5. WSL Preprod
-1. Installer WSL2 + Ubuntu
-2. Installer Docker Engine (ikke Desktop) i WSL
-3. Kopiér kode (git clone eller rsync)
-4. Opret produktionslignende `.env` (uden rigtige prod keys hvis ikke nødvendigt)
-5. Start:
+# 5. Staging (valgfri, Linux)
+En valgfri staging-miljø kan opsættes på en almindelig Linux-vært for accepttest og shadow-sammenligning:
+
+1. Klon repository på staging-værten
+2. Opret separat `.env` (fx `env/staging.env`) uden produktionshemmeligheder
+3. Validér miljø:
+```bash
+python scripts/validate_env.py --file env/staging.env
 ```
-docker compose up -d
+4. Start services med staging `.env` (kopiér midlertidigt til roden som `.env` eller brug make/compose overrides)
+```bash
+cd soegemaskine
+docker-compose --profile embeddings up -d
 ```
-6. Verificér med `docker ps` og API `/health` endpoint
+5. Shadow-test efter behov (se scripts og docker-compose.shadow.yml)
 
 # 6. Produktion
 1. Opret dedikeret linuxbruger (ingen root login)
@@ -57,19 +69,28 @@ docker compose up -d
 3. Installer Docker + Compose plugin
 4. Opret sikre `.env` filer (ikke committe)
 5. Pull repository (tag'et release anbefales)
-6. Byg og start:
+6. Validér konfiguration:
+```bash
+python scripts/validate_env.py
 ```
-docker compose pull
-docker compose up -d --build
+7. Byg og start:
+```bash
+cd soegemaskine
+docker-compose --profile embeddings pull
+docker-compose --profile embeddings up -d --build
 ```
-7. Tjek logs:
+8. Opsæt Ollama (hvis dette anvendes som provider):
+```bash
+../scripts/setup_ollama.sh
 ```
-docker compose logs --tail=100 -f
+9. Tjek logs:
+```bash
+docker-compose logs --tail=100 -f
 ```
-8. Sundhedstjek: curl API `/health`
-9. Backup DB:
-```
-docker exec -t <db_container> pg_dump -U $DB_USER $DB_NAME > backup_$(date +%F).sql
+10. Sundhedstjek: curl API `/health`
+11. Backup DB:
+```bash
+docker exec -t dho-postgres pg_dump -U $POSTGRES_USER $POSTGRES_DB > backup_$(date +%F).sql
 ```
 
 # 7. .env Håndtering
@@ -84,6 +105,27 @@ docker exec -t <db_container> pg_dump -U $DB_USER $DB_NAME > backup_$(date +%F).
 | DB fejl ved embeddings | Kontroller tabelforfiks og migationer |
 | Manglende netværk | Firewall/ufw regler |
 | Høj latenstid | Tjek embedding provider latency |
+| Konfigurationsfejl | Kør `python scripts/validate_env.py` |
+| Ollama problemer | Kør `scripts/test_ollama_setup.py` |
+| Shadow Search comparison | Kør `scripts/compare_search_results.py` |
+
+### Environment Validation
+```bash
+# Kør validering og få detaljeret fejlinfo
+python scripts/validate_env.py --strict
+
+# JSON output for automatisering
+python scripts/validate_env.py --json > env_validation.json
+```
+
+### Ollama Setup Troubleshooting
+```bash
+# Test om Ollama er korrekt konfigureret
+python scripts/test_ollama_setup.py
+
+# Genopsæt model hvis nødvendigt
+./scripts/setup_ollama.sh
+```
 
 # 9. Rollback Procedure
 1. Find tidligere image tag `docker images`.
@@ -96,6 +138,33 @@ docker exec -t <db_container> pg_dump -U $DB_USER $DB_NAME > backup_$(date +%F).
 - SSH nøgle passphrase kræves.
 - Opdater pakker regelmæssigt (`apt update && apt upgrade`).
 
-# 11. Referencer
+# 11. Deployment Scripts
+
+| Script | Funktion | Anvendelse |
+|--------|----------|------------|
+| `validate_env.py` | Validerer konfigurationsvariabler i `.env` filer | Før deployment eller konfigurationsændringer |
+| `setup_ollama.sh` | Opsætter Ollama med korrekt embedding model | Efter container opstart hvis Ollama bruges |
+| `run_shadow_search.sh` | Starter sekundær søge-API til A/B test | Til test af alternative modeller uden at påvirke hovedsøgning |
+| `compare_search_results.py` | Sammenligner søgeresultater mellem APIs | Efter kørsel af shadow search for kvalitetssammenligning |
+
+## Monitoring Scripts
+
+### Status Verification
+```bash
+# Kør for at validere systemets nuværende sundhed
+./scripts/process_books.sh --validate
+```
+
+### Container Status
+```bash
+# Tjek containere
+cd soegemaskine
+docker-compose ps
+
+# Tjek embedding service
+docker logs dho-ollama  # Hvis Ollama bruges
+```
+
+# 12. Referencer
 - ENV_KONFIGURATION
 - Arkitektur (overblik)

@@ -1,3 +1,7 @@
+# DEPRECATION NOTICE:
+# Windows/WSL preproduction setup is no longer supported.
+# Please use macOS (local) or Linux (production/staging) guides in documentation/.
+
 # 0. Installer wsl
 
 wsl --install
