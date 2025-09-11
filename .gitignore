@@ -40,3 +40,6 @@ markdown/
 soegemaskine/book_failed/
 soegemaskine/book_input/
 soegemaskine/book_output/
+
+# Manual test generated artifacts (chunking markdown output)
+create_embeddings/tests/manual/output/
