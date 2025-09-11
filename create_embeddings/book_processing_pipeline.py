@@ -6,7 +6,7 @@ fetch → parse → save. It separates orchestration from individual operations,
 providing a clean single-responsibility approach to book processing.
 
 Creation date/time: 20. juli 2025, 14:30
-Last Modified date/time: 20. juli 2025, 14:30
+Last Modified date/time: 11. september 2025, 15:30
 """
 
 import logging
@@ -176,6 +176,18 @@ class BookProcessingPipeline:
         
         # Extract text from all pages
         pdf_pages = self.extract_text_by_page(pdf)
+
+        # NEW RULE (2025-09-11): Skip first page content for multi-page PDFs
+        # Rationale: First page often contains cover/front matter not useful for semantic search.
+        # We preserve original page numbering so downstream references still align with original PDF.
+        if len(pdf_pages) > 1 and 1 in pdf_pages:
+            logger.debug(
+                "Springer første side over for multi-page PDF (%s sider) i %s",
+                len(pdf_pages),
+                book_url,
+            )
+            # Remove page 1 text only; do not renumber other pages
+            del pdf_pages[1]
         
         # Use the chunking strategy to process the document
         for page_num, chunk_text in self.chunking_strategy.process_document(

@@ -43,7 +43,8 @@ class TestEnhancedProviderInterface:
         # Test initialization
         await provider.initialize()
         assert provider.client is not None
-        assert provider.base_url == "http://localhost:11434"
+        # Default base_url now resolves to service host (docker) rather than localhost
+        assert provider.base_url == "http://ollama:11434"
         
         # Test cleanup
         await provider.cleanup()
@@ -71,7 +72,8 @@ class TestEnhancedProviderInterface:
         """Test Ollama provider context manager."""
         async with OllamaEmbeddingProvider() as provider:
             assert provider.client is not None
-            assert provider.base_url == "http://localhost:11434"
+            # Default base_url now resolves to service host (docker) rather than localhost
+            assert provider.base_url == "http://ollama:11434"
         
         assert provider.client is None
     

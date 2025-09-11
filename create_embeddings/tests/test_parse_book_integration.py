@@ -95,15 +95,13 @@ async def test_parse_book_integration_word_overlap():
     assert len(book_result["embeddings"]) > 0
     assert len(book_result["chunks"]) == len(book_result["embeddings"])
     
-    # For cross-page chunking, might have fewer chunks than pages
-    # Each chunk should be (page_num, chunk_text) tuple
+    # With new rule (skip page 1 for multi-page PDFs) no chunk should originate from page 1
     for page_num, chunk_text in book_result["chunks"]:
         assert isinstance(page_num, int)
         assert isinstance(chunk_text, str)
-        assert 1 <= page_num <= 3
+        assert 2 <= page_num <= 3  # page 1 skipped
         assert len(chunk_text.strip()) > 0
-        # Should not have title prefix (WordOverlapChunkingStrategy behavior)
-        assert not chunk_text.startswith("##")
+        assert not chunk_text.startswith("##")  # WordOverlapChunkingStrategy behavior
 
 
 @pytest.mark.asyncio
@@ -148,18 +146,18 @@ async def test_parse_book_integration_sentence_splitter():
     assert len(book_result["embeddings"]) > 0
     assert len(book_result["chunks"]) == len(book_result["embeddings"])
     
-    # For page-by-page chunking, should have chunks from each page
+    # New rule: page 1 skipped when multiple pages
     page_numbers = [page_num for page_num, _ in book_result["chunks"]]
-    assert 1 in page_numbers  # Should have chunks from page 1
-    assert 2 in page_numbers  # Should have chunks from page 2
+    assert 1 not in page_numbers
+    assert 2 in page_numbers  # page 2 remains
     
     # Each chunk should have title prefix (SentenceSplitterChunkingStrategy behavior)
     for page_num, chunk_text in book_result["chunks"]:
         assert isinstance(page_num, int)
         assert isinstance(chunk_text, str)
-        assert 1 <= page_num <= 2
+        assert 2 <= page_num <= 2  # only page 2 now (page 1 skipped, total pages =2)
         assert len(chunk_text.strip()) > 0
-        # Should have title prefix
+        # Should have title prefix for sentence splitter strategy
         assert chunk_text.startswith("##Test Book##"), f"Chunk missing title: {chunk_text[:50]}"
 
 

@@ -270,12 +270,12 @@ async def test_sentence_splitter_end_to_end_integration():
     page_numbers = [page_num for page_num, _ in book_result["chunks"]]
     unique_pages = set(page_numbers)
     
-    # Should have chunks from all pages
-    assert unique_pages == {1, 2, 3}  # All pages represented
+    # Skip-first-page rule (multi-page): page 1 content removed, expect pages 2 and 3 only
+    assert unique_pages == {2, 3}
     
     # Verify chunk characteristics
     for page_num, chunk_text in book_result["chunks"]:
-        assert 1 <= page_num <= 3  # Valid page numbers
+        assert 2 <= page_num <= 3  # Valid page numbers after skipping page 1
         assert chunk_text.startswith("##Integration Test Book##")  # Has title prefix
     
     # Verify embeddings were generated
