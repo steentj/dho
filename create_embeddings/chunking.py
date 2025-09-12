@@ -306,8 +306,9 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
         
         for page_num in sorted(pages_text.keys()):
             page_text = pages_text[page_num].strip()
+            # Always add a page marker at the start of the page, even if it's empty
+            page_markers.append((current_word_position, page_num))
             if page_text:
-                page_markers.append((current_word_position, page_num))
                 full_text_parts.append(page_text)
                 current_word_position += len(page_text.split())
         
@@ -317,23 +318,35 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
         # Get chunks from the strategy
         chunks = list(self.chunk_text(full_text, chunk_size, title))
         
-        # Determine starting page for each chunk
-        current_word_pos = 0
+        # Determine starting page for each chunk, accounting for overlap
+        last_chunk_words: list[str] | None = None
+        last_chunk_start_pos: int = 0
         
         for chunk in chunks:
             if chunk.strip():  # Skip empty chunks
                 # Ensure chunking strategy returns proper string type
                 if not isinstance(chunk, str):
                     raise TypeError(
-                        f"WordOverlapChunkingStrategy.chunk_text must return strings, "
-                        f"got {type(chunk)} at word position {current_word_pos}"
+                        f"WordOverlapChunkingStrategy.chunk_text must return strings, got {type(chunk)}"
                     )
-                
-                chunk_start_page = self._find_starting_page(current_word_pos, page_markers)
+
+                current_words = chunk.split()
+
+                if last_chunk_words is None:
+                    # First chunk starts at position 0
+                    start_pos = 0
+                else:
+                    # Compute actual overlap between previous chunk's suffix and current chunk's prefix
+                    overlap = self._compute_word_overlap(last_chunk_words, current_words, chunk_size)
+                    # Next chunk starts after net advance (previous length minus overlap)
+                    start_pos = last_chunk_start_pos + len(last_chunk_words) - overlap
+
+                chunk_start_page = self._find_starting_page(start_pos, page_markers)
                 yield (chunk_start_page, chunk)
-                
-                # Move position forward by the number of words in this chunk
-                current_word_pos += len(chunk.split())
+
+                # Prepare for next iteration
+                last_chunk_words = current_words
+                last_chunk_start_pos = start_pos
     
     def _find_starting_page(self, word_position: int, page_markers: list[tuple[int, int]]) -> int:
         """
@@ -353,6 +366,34 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
                 break
         
         return starting_page
+
+    def _compute_word_overlap(self, prev_words: list[str], curr_words: list[str], chunk_size: int) -> int:
+        """
+        Compute the number of overlapping words between the end of prev_words and the
+        beginning of curr_words. This mirrors the overlap behavior used during chunking.
+
+        We conservatively search for the longest suffix/prefix match, bounded by the
+        available words. Chunk sizes are small (~400 words), so a simple scan is fine.
+        """
+        if not prev_words or not curr_words:
+            return 0
+
+        # Intended overlap ~12.5% of target, capped with 20% tolerance (mirrors _prepare_overlap)
+        try:
+            target_words = max(1, int(chunk_size))
+        except Exception:
+            target_words = 1
+        overlap_words = max(1, int(round(target_words * 0.125)))
+        overlap_cap = max(1, int(overlap_words * 1.2))  # allow 20% tolerance
+
+        # Upper bound for overlap to check should not exceed the cap nor the available words
+        max_k = min(len(prev_words), len(curr_words), overlap_cap)
+
+        # Search from largest possible overlap downwards for first match
+        for k in range(max_k, 0, -1):
+            if prev_words[-k:] == curr_words[:k]:
+                return k
+        return 0
 
 
 class ChunkingStrategyRegistry:
