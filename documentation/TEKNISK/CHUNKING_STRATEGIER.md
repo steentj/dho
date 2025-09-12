@@ -79,25 +79,23 @@ Output Chunk:
 #### Konfiguration
 ```bash
 CHUNKING_STRATEGY=word_overlap
-CHUNK_SIZE=400  # Ignoreres - bruger fast størrelse
+CHUNK_SIZE=400  # Bruges som mål for chunk størrelse
 ```
 
 #### Funktionalitet
-- **Opdeling**: Fast 400-ord chunks med 50-ord overlap
-- **Token Limit**: Ignorerer CHUNK_SIZE parameter
+- **Opdeling**: Chunks på op til CHUNK_SIZE ord med overlap (~12,5% af CHUNK_SIZE)
+- **Token Limit**: Respekterer CHUNK_SIZE parameter
 - **Titel Prefiks**: Ingen - kun ren tekst
-- **Overlap**: 50 ord deles mellem tilstødende chunks
+- **Overlap**: Ca. 12,5% af CHUNK_SIZE deles mellem tilstødende chunks
 - **Cross-Page**: Fuld support på tværs af sider
 
 #### Algoritme
 ```python
 1. Kombiner al tekst fra alle sider
-2. Opdel i individuelle ord
-3. Opret 400-ord chunks med 50-ord overlap:
-   - Chunk 1: ord 1-400
-   - Chunk 2: ord 351-750 (overlap: 351-400)
-   - Chunk 3: ord 701-1100 (overlap: 701-750)
-4. Returner chunks uden titel prefiks
+2. Opdel i sætninger og akkumuler til chunket når ordtælling nærmer sig CHUNK_SIZE
+3. Når grænsen nås: afslut chunk og start nyt med overlap (~12,5% af CHUNK_SIZE)
+4. Hårdsplit kun hvis en enkelt sætning overstiger CHUNK_SIZE (opdel i ord)
+5. Returner chunks uden titel prefiks
 ```
 
 #### Fordele
@@ -107,8 +105,8 @@ CHUNK_SIZE=400  # Ignoreres - bruger fast størrelse
 - **Cross-page seamless**: Ingen tab ved sidegrænser
 
 #### Ulemper
-- **Ignorerer CHUNK_SIZE**: Kan ikke tilpasse størrelse
-- **Kan splitte midt i sætning**: Mindre respekt for sprog boundaries
+- **Overlap koster tokens**: En smule redundans mellem chunks
+- **Kan splitte midt i sætning ved hårdsplit**: Når enkeltsætninger er længere end CHUNK_SIZE
 - **Ingen titel kontekst**: Chunks mangler bog identificering
 
 #### Bedst til
@@ -176,7 +174,7 @@ CHUNK_SIZE=400  # Sikker margin
 #### Høj Throughput
 ```bash
 CHUNKING_STRATEGY=word_overlap  # Konsistent processering
-CHUNK_SIZE=400  # Ignoreres men sat for reference
+CHUNK_SIZE=400  # Mål for chunk størrelse
 ```
 
 #### Høj Kvalitet

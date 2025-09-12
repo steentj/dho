@@ -202,7 +202,8 @@ async def test_word_overlap_end_to_end_integration():
         
         # Chunks should be substantial but not too large
         assert chunk_word_count >= 100, f"Chunk {i+1} has {chunk_word_count} words, expected ≥100"
-        assert chunk_word_count <= 500, f"Chunk {i+1} has {chunk_word_count} words, expected ≤500"
+        # Should not exceed configured chunk_size by more than tolerance
+        assert chunk_word_count <= int(chunk_size * 1.1) + 1, f"Chunk {i+1} too large: {chunk_word_count} > {chunk_size}"
         
         assert not chunk_text.startswith("##")  # No title prefix
     

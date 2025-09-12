@@ -93,10 +93,10 @@ CHUNKING_STRATEGY=sentence_splitter       # Valg: sentence_splitter, word_overla
 - **Max tokens**: Respekterer `CHUNK_SIZE` parameter
 
 ##### `word_overlap`
-- **Funktion**: Fast 400-ord chunks med 50-ord overlap
+- **Funktion**: Chunks på op til `CHUNK_SIZE` ord med overlap (~12,5% af `CHUNK_SIZE`)
 - **Fordele**: Konsistent chunk størrelse, bevarer kontekst mellem chunks
 - **Bedst til**: Lange dokumenter, når overlap er vigtigt
-- **Max tokens**: Ignorerer `CHUNK_SIZE`, bruger fast størrelse
+- **Max tokens**: Respekterer `CHUNK_SIZE`
 
 ### 📁 **Processering Konfiguration**
 

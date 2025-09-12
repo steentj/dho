@@ -187,12 +187,12 @@ CHUNK_SIZE=500
 ```bash
 # I .env fil
 CHUNKING_STRATEGY=word_overlap
-CHUNK_SIZE=400  # Ignoreres, bruger fast 400-ord chunks
+CHUNK_SIZE=400  # Bruges som mål for chunk størrelse
 ```
 
 **Karakteristika:**
-- Fast 400-ord chunks med 50-ord overlap
-- Ignorerer CHUNK_SIZE parameter
+- Chunks på op til CHUNK_SIZE ord med overlap (~12,5% af CHUNK_SIZE)
+- Respekterer CHUNK_SIZE parameter
 - Ingen titel prefiks
 - Bedst til: Lange dokumenter med kontekst behov
 

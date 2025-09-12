@@ -162,9 +162,10 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
 
     def chunk_text(self, text: str, max_tokens: int, title: str = None) -> Iterable[str]:
         """
-        Splits text into chunks of approximately 400 words with 50-word overlap, respecting sentence boundaries.
-        For small texts that are much smaller than 400 words, respects max_tokens parameter.
-        Title parameter is ignored for large texts but respected for small texts.
+        Splits text into chunks of approximately max_tokens words with overlap, respecting sentence boundaries.
+        The overlap defaults to ~12.5% of max_tokens (e.g., 50 when max_tokens=400).
+        For small texts, falls back to word-based chunking that respects max_tokens.
+        Title parameter is ignored for this strategy.
         """
         # Clean and normalize whitespace
         text = re.sub(r"\s+", " ", text.strip())
@@ -172,6 +173,9 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
             return
 
         words = text.split()
+        # Guardrail for non-positive values
+        target_words = max(1, int(max_tokens))
+        overlap_words = max(1, int(round(target_words * 0.125)))  # ~12.5% overlap (50 when target=400)
         
         # For small texts (less than 30 words), use different logic based on context
         # For larger texts, use sentence-based 400-word chunking 
@@ -183,7 +187,7 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
                 return
             
             # For other small texts, use word-based chunking respecting max_tokens
-            for i in range(0, len(words), max_tokens):
+            for i in range(0, len(words), target_words):
                 chunk_words = words[i:i + max_tokens]
                 chunk_text = " ".join(chunk_words)
                 
@@ -191,18 +195,16 @@ class WordOverlapChunkingStrategy(ChunkingStrategy):
                 yield chunk_text
             return
 
-        # For larger texts, use the original sentence-based 400-word chunking
+        # For larger texts, use sentence-based chunking around target size
         # Split text into sentences using a regular expression
         sentences = [s.strip() for s in re.findall(r'[^.!?]+[.!?]', text)]
         
         # If no sentences found (no ending punctuation), treat the entire text as one sentence
         if not sentences and text:
             sentences = [text]
-        
+
         current_chunk_sentences = []
         current_chunk_words = 0
-        target_words = 400
-        overlap_words = 50
         last_was_hard_split = False
 
         for sentence in sentences:

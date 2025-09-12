@@ -57,10 +57,10 @@ def word_overlap_strategy():
 def test_word_overlap_basic_chunking(word_overlap_strategy):
     # Create text with approximately 450 words (should create 2 chunks)
     text = " ".join(["This is sentence number {}.".format(i) for i in range(1, 91)])  # ~450 words
-    chunks = list(word_overlap_strategy.chunk_text(text, max_tokens=500))  # max_tokens ignored
+    chunks = list(word_overlap_strategy.chunk_text(text, max_tokens=400))
     
     assert len(chunks) == 2
-    # First chunk should be around 400 words
+    # First chunk should be around max_tokens words
     first_chunk_words = len(chunks[0].split())
     assert 360 <= first_chunk_words <= 440  # Allow 10% tolerance around 400
     
@@ -68,11 +68,19 @@ def test_word_overlap_basic_chunking(word_overlap_strategy):
     second_chunk_words = len(chunks[1].split())
     assert second_chunk_words > 0
 
-def test_word_overlap_ignores_max_tokens(word_overlap_strategy):
+def test_word_overlap_respects_max_tokens_small_text(word_overlap_strategy):
+    # 20 simple words without punctuation triggers small-text path
+    text = " ".join([f"word{i}" for i in range(1, 21)])
+    chunks = list(word_overlap_strategy.chunk_text(text, max_tokens=7))
+    # Expect ceil(20/7) = 3 chunks, all <= 7 words
+    assert len(chunks) == 3
+    assert all(len(chunk.split()) <= 7 for chunk in chunks)
+
+def test_word_overlap_tiny_text_guard(word_overlap_strategy):
+    # For extremely small texts and max_tokens=1 we avoid over-chunking by design
     text = "This is a short sentence. This is another short sentence."
-    # Even with max_tokens=1, should still chunk based on 400-word target
     chunks = list(word_overlap_strategy.chunk_text(text, max_tokens=1))
-    assert len(chunks) == 1  # Too short to split
+    assert len(chunks) == 1
 
 def test_word_overlap_ignores_title(word_overlap_strategy):
     text = "This is a sentence."
@@ -98,10 +106,10 @@ def test_word_overlap_hard_split_long_sentence(word_overlap_strategy):
     chunks = list(word_overlap_strategy.chunk_text(long_sentence, max_tokens=10))
     
     assert len(chunks) > 1  # Should be split
-    # Each chunk should be approximately 400 words
+    # Each chunk should be no more than max_tokens words
     for chunk in chunks:
         word_count = len(chunk.split())
-        assert word_count <= 400
+        assert word_count <= 10
 
 def test_factory_creates_word_overlap_strategy():
     strategy = ChunkingStrategyFactory.create_strategy("word_overlap")
@@ -142,7 +150,8 @@ def test_word_overlap_functionality(word_overlap_strategy):
 def test_word_overlap_no_overlap_for_hard_split(word_overlap_strategy):
     # Create a single very long sentence that will be hard-split
     long_sentence = "This is an extremely " + "very " * 500 + "long sentence."
-    chunks = list(word_overlap_strategy.chunk_text(long_sentence, max_tokens=500))
+    # Use a smaller max_tokens so the single sentence exceeds the hard-split threshold
+    chunks = list(word_overlap_strategy.chunk_text(long_sentence, max_tokens=100))
     
     assert len(chunks) >= 2  # Should be split
     

@@ -177,7 +177,7 @@ def _write_markdown(book_data: dict, provider: MockEmbeddingProvider, strategy_n
 async def test_manual_real_pdf_sentence_splitter():
     """Manuel test: sentence_splitter strategi. Ingen DB writes."""
     strategy = SentenceSplitterChunkingStrategy()
-    book_data, provider = await _process(REAL_PDF_PATH, "sentence_splitter", strategy, chunk_size=400)
+    book_data, provider = await _process(REAL_PDF_PATH, "sentence_splitter", strategy, chunk_size=300)
 
     # Minimum sanity assertions (no persistence side-effects)
     assert len(book_data['chunks']) == len(book_data['embeddings'])
@@ -195,7 +195,7 @@ async def test_manual_real_pdf_sentence_splitter():
 async def test_manual_real_pdf_word_overlap():
     """Manuel test: word_overlap strategi. Ingen DB writes."""
     strategy = WordOverlapChunkingStrategy()
-    book_data, provider = await _process(REAL_PDF_PATH, "word_overlap", strategy, chunk_size=400)
+    book_data, provider = await _process(REAL_PDF_PATH, "word_overlap", strategy, chunk_size=300)
 
     assert len(book_data['chunks']) == len(book_data['embeddings'])
     assert provider.calls == len(book_data['chunks'])
