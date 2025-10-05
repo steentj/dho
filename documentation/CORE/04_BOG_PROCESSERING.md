@@ -1,7 +1,7 @@
 Titel: Bogprocessering Guide
 Version: v1.0
 Oprettet: 2025-09-04
-Sidst ændret: 2025-09-04
+Sidst ændret: 2025-09-30
 Ejerskab: Data Pipeline Ansvarlig
 Formål: Vise hvordan nye bøger tilføjes og embeddings genereres
 
@@ -52,6 +52,7 @@ Instruktion i at køre pipeline for nye bøger.
 # 4. Genprøv fejlede bøger
 ./scripts/process_books.sh --retry-failed
 ```
+> **Vigtigt:** Disse kommandoer skal køres på den maskine hvor Docker containerne afvikles. For lokal test er det din Mac; for produktion er det den eksterne Linux-server (via SSH).
 
 ### Med Provider/Model Overriding
 ```bash
@@ -80,6 +81,7 @@ python -m create_embeddings.book_processor_wrapper --input example_books.txt
 cd soegemaskine
 docker-compose --profile embeddings run --rm book-processor --input-file example_books.txt
 ```
+> **Bemærk:** Alle Docker-kommandoer (`docker-compose build`, `docker-compose up`, `docker-compose run` osv.) skal køres direkte på værtsmaskinen for Docker-installationen.
 
 # 7. Overvågning
 
@@ -130,3 +132,39 @@ Systemet springer embeddings over hvis de allerede findes (provider + bog-ID).
 - CHUNKING_STRATEGIER
 - PROVIDER_OVERSIGT
 - ENV_KONFIGURATION
+
+# 12. Lokal vs. Produktion
+
+| Scenario | Hvor kører du kommandoerne? | Nødvendige filer | Miljøvariabler |
+|----------|-----------------------------|------------------|-----------------|
+| Lokal udvikling | Terminal på din Mac | Bogliste (`example_books.txt`), lokale inputfiler | `soegemaskine/.env` med lokale database-/providerdetaljer |
+| Produktion | SSH-terminal på Linux-serveren | Bogliste kopieret til serveren, relevante ressourcer | `soegemaskine/.env` på serveren med produktionsdetaljer |
+
+## 12.1 Lokal Udvikling
+
+1. Sørg for at Docker kører på din Mac.
+2. Opdater `soegemaskine/.env` med lokale db-, provider- og modelindstillinger.
+3. Kør kommandoerne direkte i din lokale terminal:
+	```bash
+	./scripts/process_books.sh --validate
+	./scripts/process_books.sh --file example_books.txt
+	```
+
+## 12.2 Produktion Deployment
+
+1. Kopiér boglisten til produktion (f.eks. via `scp`).
+2. Opret SSH-forbindelse til produktionsserveren:
+	```bash
+	ssh bruger@server
+	```
+3. Navigér til projektets rodmappe (`SlægtBib/src`).
+4. Kør alle script- og Docker-kommandoer direkte på serveren:
+	```bash
+	cd soegemaskine
+	docker-compose build book-processor
+	cd ..
+	./scripts/process_books.sh --file dine_boeger.txt
+	```
+5. Bekræft at `soegemaskine/.env` på serveren er konfigureret til produktionsdatabasen, og at søge-API'ens `.env` forbliver uændret.
+
+> **Tip:** Book-processeringscontaineren kan genstartes og rebuildes uden at forstyrre den kørende søge-API, fordi de anvender separate Docker-services og `.env` filer.

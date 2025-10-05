@@ -73,7 +73,8 @@ class BookProcessorWrapper:
             raise FileNotFoundError(f"Inputfil ikke fundet: {input_file_path}")
             
         # Create pipeline for URL loading
-        from .book_processing_pipeline import BookProcessingPipeline
+        # Import via package path to support execution as a script inside container
+        from create_embeddings.book_processing_pipeline import BookProcessingPipeline
         temp_pipeline = BookProcessingPipeline(
             book_service=None,  # Will be set up later
             embedding_provider=None,  # Will be set up later
@@ -101,7 +102,7 @@ class BookProcessorWrapper:
         
         try:
             # Use the orchestrator pattern for clean dependency injection
-            from .book_processing_orchestrator import BookProcessingApplication
+            from create_embeddings.book_processing_orchestrator import BookProcessingApplication
             
             # Process books through the application orchestrator
             await BookProcessingApplication.run_book_processing(

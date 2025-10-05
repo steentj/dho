@@ -15,13 +15,8 @@ RUN apt-get update && apt-get install -y \
 COPY create_embeddings/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire create_embeddings package structure
-COPY create_embeddings/__init__.py ./create_embeddings/
-COPY create_embeddings/opret_bøger.py ./create_embeddings/
-COPY create_embeddings/book_processor_wrapper.py ./create_embeddings/
-COPY create_embeddings/logging_config.py ./create_embeddings/
-COPY create_embeddings/chunking.py ./create_embeddings/
-COPY create_embeddings/providers/ ./create_embeddings/providers/
+# Copy the entire create_embeddings package structure (includes pipeline/orchestrator modules)
+COPY create_embeddings/ ./create_embeddings/
 
 # Copy the database module for dependency injection
 COPY database/ ./database/

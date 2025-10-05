@@ -54,6 +54,30 @@ mkdir -p book_input book_output book_failed
 
 if [ "$VALIDATE_ONLY" = true ]; then
     echo "=== Validating Configuration ==="
+    # Ensure required directories exist with minimal necessary permissions
+    REQUIRED_DIRS=(book_input book_output book_failed)
+    for dir in "${REQUIRED_DIRS[@]}"; do
+        mkdir -p "$dir"
+        chmod 700 "$dir"
+
+        if ! test -w "$dir"; then
+            echo "Adjusting permissions so $(whoami) can write to $dir..."
+            chmod u+rwx "$dir" || { echo "Failed to grant write access to $dir" >&2; exit 1; }
+        fi
+
+        if command -v setfacl >/dev/null 2>&1; then
+            setfacl -m u:1000:rwx "$dir"
+            setfacl -m d:u:1000:rwx "$dir"
+        else
+            chmod 770 "$dir"
+        fi
+
+        if ! touch "$dir/.permission_test" >/dev/null 2>&1; then
+            echo "Permission check failed for $dir (cannot create files)" >&2
+            exit 1
+        fi
+        rm -f "$dir/.permission_test"
+    done
     # Stage 2 addition: local validation before container-based validation
     if [ -f .env ]; then
         echo "Running host-side validation (scripts/validate_env.py)..."
@@ -61,7 +85,8 @@ if [ "$VALIDATE_ONLY" = true ]; then
     else
         echo "Warning: .env file not found in soegemaskine directory; skipping host validation" >&2
     fi
-    docker-compose run --rm book-processor --validate-config
+    # --no-deps ensures we reuse production postgres/ollama instead of trying to start new ones
+    docker-compose run --rm --no-deps book-processor --validate-config
     exit $?
 fi
 
@@ -107,7 +132,7 @@ if [ "$RETRY_FAILED" = true ]; then
     
     echo "Retrying $failed_count failed books..."
     # Allow provider/model overrides on retry as well
-    DOCKER_CMD=(docker-compose run --rm)
+    DOCKER_CMD=(docker-compose run --rm --no-deps)
     if [ -n "$OVERRIDE_PROVIDER" ]; then
         case "$OVERRIDE_PROVIDER" in
             openai|ollama|dummy) DOCKER_CMD+=( -e PROVIDER="$OVERRIDE_PROVIDER" ) ;;
@@ -172,7 +197,7 @@ elif [ -n "$INPUT_FILE" ]; then
     echo ""
     
     # Build docker compose run command with ephemeral env overrides
-    DOCKER_CMD=(docker-compose run --rm)
+    DOCKER_CMD=(docker-compose run --rm --no-deps)
     if [ -n "$OVERRIDE_PROVIDER" ]; then
         DOCKER_CMD+=( -e PROVIDER="$OVERRIDE_PROVIDER" )
     fi
@@ -187,7 +212,9 @@ elif [ -n "$INPUT_FILE" ]; then
             DOCKER_CMD+=( -e OPENAI_MODEL="$OVERRIDE_MODEL" -e OLLAMA_MODEL="$OVERRIDE_MODEL" )
         fi
     fi
-    DOCKER_CMD+=( book-processor --input-file "$INPUT_FILENAME" )
+    # Container expects files under /app/input mounted from host book_input
+    CONTAINER_INPUT_PATH="input/$INPUT_FILENAME"
+    DOCKER_CMD+=( book-processor --input-file "$CONTAINER_INPUT_PATH" )
     echo "Running: ${DOCKER_CMD[*]}"
     "${DOCKER_CMD[@]}"
 else
