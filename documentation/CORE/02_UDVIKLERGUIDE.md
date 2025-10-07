@@ -17,19 +17,14 @@ For udviklere og bidragsydere der ændrer eller udvider kodebasen.
 6. PR med checkliste
 
 # 3. Miljøhåndtering
-- Brug altid virtual environment:
-```
-python -m venv .venv
-source .venv/bin/activate
-pip install -r create_embeddings/requirements.txt
-```
-- Isolér hemmeligheder i subsystem-specifik `.env`.
-- Del aldrig faktiske nøgler; brug `.env.template`.
+- Brug altid container-stacken (`make -C soegemaskine up-local`) til end-to-end tests; supplér med lokal venv ved behov.
+- Isolér hemmeligheder i subsystem-specifik `.env` (se `REFERENCE/KONFIGURATION.md`).
+- Del aldrig faktiske nøgler; brug `.env.template` eller `env/<miljø>.env` kopier.
 
 # 4. .env og Konfiguration
-- Tests må ikke læse rigtige .env: mock `load_dotenv()`.
-- Brug: `with patch.dict(os.environ, {...}, clear=True)` for total isolation.
-- Se `ENV_KONFIGURATION.md` for variabelmatrix.
+- Tests må ikke læse rigtige `.env`: mock `load_dotenv()`.
+- Brug `with patch.dict(os.environ, {...}, clear=True)` for total isolation.
+- Se `REFERENCE/KONFIGURATION.md` for variabeloversigt og inline eksempler.
 
 # 5. Providers – ændringscheckliste
 Når du ændrer embedding/chunking/database:
@@ -90,5 +85,5 @@ def test_sentence_splitter_basic():
 
 # 11. Referencer
 - Arkitektur (overblik)
-- ENV_KONFIGURATION
-- PROVIDER_OVERSIGT
+- `REFERENCE/KONFIGURATION.md`
+- `REFERENCER/PROVIDER_OVERSIGT.md`

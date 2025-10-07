@@ -22,90 +22,40 @@ cp .env.template .env
 # Redigér .env efter dine behov
 
 # Start system
-./scripts/process_books.sh --validate
-```
+# DHO Semantisk Søgemaskine – Dokumentationsoverblik
 
-## 📚 **Dokumentation**
+## 📚 Struktur (hurtigt overblik)
 
-### Brugerguider
-- **[Installation Guide](BRUGERGUIDER/INSTALLATION.md)** - Komplet installationsvejledning med container management
-- **[Bog Processering](BRUGERGUIDER/BOG_PROCESSERING.md)** - Processering af bøger og container rebuilding
-- **[Bog Processering](BRUGERGUIDER/BOG_PROCESSERING.md)** - Guide til at tilføje bøger til systemet
-- **[Lokal Udvikling](BRUGERGUIDER/LOKAL_UDVIKLING.md)** - Udvikling og testing guide
+- **Guides** – operationelle trin-for-trin beskrivelser
+	- `GUIDES/LOCAL_SETUP.md`
+	- `GUIDES/PRODUCTION_DEPLOY.md`
+	- `GUIDES/BOOK_UPDATES.md`
+- **Core** – overordnede principper og arkitektur
+	- `CORE/01_ARKITEKTUR.md`
+	- `CORE/02_UDVIKLERGUIDE.md`
+	- `CORE/03_DEPLOYMENT.md`
+	- `CORE/04_BOG_PROCESSERING.md`
+	- `CORE/05_SOEGE_API_GUIDE.md`
+- **Reference** – opslagsværk og konfigurationer
+	- `REFERENCE/KONFIGURATION.md`
+	- `TEKNISK/CHUNKING_STRATEGIER.md`
+	- `REFERENCER/PROVIDER_OVERSIGT.md`
+- **Arkiv** – historiske rapporter og afsluttede faser (`ARKIV/`)
 
-### Teknisk Dokumentation
-- **[System Arkitektur](TEKNISK/ARKITEKTUR.md)** - Teknisk systemoversigt
-- **[Konfiguration](KONFIGURATION.md)** - Komplet konfigurationsreference
-- **[Konfigurationseksempler](EKSEMPLER/)** - Komplette .env eksempler for forskellige scenarier
-- **[Chunking Strategier](TEKNISK/CHUNKING_STRATEGIER.md)** - Guide til tekst chunking
-- **[API Reference](TEKNISK/API_REFERENCE.md)** - API dokumentation
+## � Sædvanlige indgangspunkter
 
-## 🔧 **Hovedkomponenter**
+- Skal du starte lokalt? → læs `GUIDES/LOCAL_SETUP.md`.
+- Skal du deploye en opdatering? → følg `GUIDES/PRODUCTION_DEPLOY.md` + `CORE/03_DEPLOYMENT.md`.
+- Skal du indlæse nye bøger? → se `GUIDES/BOOK_UPDATES.md` + `CORE/04_BOG_PROCESSERING.md`.
+- Mangler du miljøvariabler? → tjek `REFERENCE/KONFIGURATION.md`.
 
-### Database Layer
-- **Pluggable arkitektur**: Understøtter flere database typer
-- **PostgreSQL implementation**: Fuldt implementeret og testet
-- **Dependency injection**: Nem udskiftning af database providers
+## 🔗 Yderligere ressourcer
 
-### Embedding Providers
-- **OpenAI**: Cloud-baserede embeddings med høj kvalitet
-- **Ollama**: Lokale embeddings uden API omkostninger
-- **Dummy**: Test provider til udvikling
-
-### Chunking Strategier
-- **Sentence Splitter**: Opdeler efter sætninger med titel prefiks
-- **Word Overlap**: Fast chunk størrelse med overlap for kontekst
-
-### Søgemaskine
-- **Flask-baseret API**: RESTful søge interface
-- **Vector søgning**: Semantisk søgning i embedding space
-- **Filtrering**: Avancerede søgefiltre og sortering
-
-## 🛠 **Centrale Scripts**
-
-### Python Scripts
-- `opret_bøger.py` - Kerne bog processering funktionalitet
-- `book_processor_wrapper.py` - Brugervenligt wrapper med monitoring
-
-### Bash Scripts
-- `process_books.sh` - Hovedscript til bog processering
-- `setup_ollama.sh` - Opsætning af lokale embeddings
-
-## 📊 **Systemstatus**
-
-| Komponent | Status | Beskrivelse |
-|-----------|--------|-------------|
-| Database Layer | ✅ Komplet | Pluggable PostgreSQL implementation |
-| Embedding Providers | ✅ Komplet | OpenAI, Ollama, Dummy providers |
-| Chunking Strategier | ✅ Komplet | Multiple strategies implementeret |
-| Konfigurationshåndtering | ✅ Komplet | Unified template og validering |
-| Dokumentation | ✅ Komplet | Struktureret dansk dokumentation |
-| Test Suite | ✅ Komplet | Omfattende unit og integration tests |
-
-## 🔗 **Eksterne Afhængigheder**
-
-- **Docker & Docker Compose**: Container orkestrering
-- **PostgreSQL**: Database motor
-- **Ollama**: Lokal embedding server (valgfri)
-- **OpenAI API**: Cloud embeddings (valgfri)
-
-## 📝 **Bidrag og Udvikling**
-
-Se [Lokal Udvikling](BRUGERGUIDER/LOKAL_UDVIKLING.md) for information om:
-- Development environment setup
-- Test kørsler
-- Code contribution guidelines
-- Debugging guides
-
-## 📞 **Support**
-
-For spørgsmål og support:
-1. Tjek denne dokumentation først
-2. Se [troubelshooting guide](BRUGERGUIDER/LOKAL_UDVIKLING.md#fejlfinding)
-3. Kontakt development team
+- Kodeoverblik: se repository-roden `README.md`.
+- Test- og udviklingspraksis: `CORE/02_UDVIKLERGUIDE.md`.
+- API-detaljer: `CORE/05_SOEGE_API_GUIDE.md`.
+- Shadow- og provider-sammenligning: scripts i `/scripts` + noter i `TEKNISK/OPERATIONS_ENVIRONMENTS.md`.
 
 ---
-
-**Version**: 2025.1  
-**Sidst opdateret**: Juni 2025  
-**Sprog**: Dansk
+Denne fil opdateres når struktur eller væsentlige entrypoints ændres. Sidst opdateret: 2025-10-07.
+- **Vector søgning**: Semantisk søgning i embedding space

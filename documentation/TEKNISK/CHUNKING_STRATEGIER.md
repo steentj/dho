@@ -276,6 +276,6 @@ print(f'Chunks: {chunks}')
 ---
 
 **Se også:**
-- [Konfigurationsguide](../KONFIGURATION.md) for parameter detaljer
-- [Bog Processering](../BRUGERGUIDER/BOG_PROCESSERING.md) for praktisk brug
-- [API Reference](API_REFERENCE.md) for teknisk implementation
+- [Konfigurationsguide](../REFERENCE/KONFIGURATION.md) for parameter detaljer
+- [Bog Processering](../GUIDES/BOOK_UPDATES.md) for praktisk brug
+- [Udviklerguide](../CORE/02_UDVIKLERGUIDE.md) for teknisk implementation

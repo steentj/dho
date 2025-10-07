@@ -85,5 +85,5 @@ sequenceDiagram
 - Adskil debug vs info i miljø via LOG_LEVEL.
 
 # 10. Videre læsning
-- Referencer: PROVIDER_OVERSIGT, CHUNKING_STRATEGIER, ENV_KONFIGURATION
+- Referencer: `REFERENCER/PROVIDER_OVERSIGT.md`, `TEKNISK/CHUNKING_STRATEGIER.md`, `REFERENCE/KONFIGURATION.md`
 - Udviklerguide for test og kvalitetsporte

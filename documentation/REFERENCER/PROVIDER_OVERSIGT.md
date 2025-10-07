@@ -16,7 +16,7 @@ Systemet benytter Dependency Injection for nemt at skifte implementeringer.
 | dummy | Tests | Deterministisk, hurtig | Ingen semantisk værdi |
 
 # 3. Chunking Strategier
-Se CHUNKING_STRATEGIER.
+Se `TEKNISK/CHUNKING_STRATEGIER.md`.
 
 # 4. Database Provider
 | Navn | Teknologi | Funktioner |
@@ -32,8 +32,8 @@ Se CHUNKING_STRATEGIER.
 
 # 6. Navngivningskonventioner
 - Tabeller: `chunks_<provider>` (fx `chunks_openai`)
-- Miljøvariabel: `EMBEDDING_PROVIDER`
-- Strategievariabel: `CHUNK_STRATEGY`
+- Miljøvariabel: `PROVIDER`
+- Strategievariabel: `CHUNKING_STRATEGY`
 
 # 7. Kendte Faldgruber
 | Problem | Løsning |
@@ -44,4 +44,4 @@ Se CHUNKING_STRATEGIER.
 # 8. Referencer
 - Arkitektur
 - Udviklerguide
-- ENV_KONFIGURATION
+- `REFERENCE/KONFIGURATION.md`

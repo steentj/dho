@@ -1,170 +1,97 @@
+docker-compose --profile embeddings run --rm book-processor --input-file example_books.txt
+docker logs dho-book-processor
 Titel: Bogprocessering Guide
-Version: v1.0
+Version: v1.1
 Oprettet: 2025-09-04
-Sidst ændret: 2025-09-30
+Sidst ændret: 2025-10-07
 Ejerskab: Data Pipeline Ansvarlig
-Formål: Vise hvordan nye bøger tilføjes og embeddings genereres
+Formål: Beskrive den driftsmæssige proces for at indlæse bøger i databasen via pipeline og scripts.
 
-# 1. Formål
-Instruktion i at køre pipeline for nye bøger.
-
-# 2. Pipeline Oversigt
-1. Input PDF → tekstudtræk
-2. Chunking (strategi valgt)
-3. Embedding generation
+# 1. Overblik
+Pipeline-forløbet består af fire trin:
+1. Indlæsning af PDF via URL (download & ekstraktion)
+2. Chunking efter valgt strategi
+3. Embedding-generation via provider
 4. Persistens i PostgreSQL (chunks + vektorer)
 
-# 3. Krævede Input
-| Type | Beskrivelse | Eksempel |
-|------|-------------|----------|
-| PDF | Original kildefil | `pdf/krønike.pdf` |
-| Batch fil | Liste over URL'er / lokationer | `example_books.txt` |
-| Strategi | `sentence_splitter` eller `word_overlap` | miljøvariabel |
+Workflowen køres via Docker-containeren `book-processor` og orkestreres af `scripts/process_books.sh`.
 
-# 4. Scripts i `scripts/`
-| Script | Funktion |
-|--------|----------|
-| `process_books.sh` | Hovedscript til bog-processering. Håndterer input filer, processeringsvalidering, overvågning, og genkørsler. Bruges via kommandolinjen med forskellige flags (`--file`, `--retry-failed`, `--monitor`, `--validate`, `--provider`, `--model`). |
-| `setup_ollama.sh` | Opsætter Ollama containeren med den korrekte embedding model (`nomic-embed-text`). Skal køres efter Docker containere er startet hvis Ollama anvendes som embedding provider. |
-| `validate_env.py` | Validerer konfigurationsvariabler i `.env` filer. Bruges af `process_books.sh --validate` men kan også køres selvstændigt. Verificerer korrekt opsætning af environment variabler for providers og database. |
-| `run_shadow_search.sh` | Starter en sekundær søge-API (på port 18000) med mulighed for at bruge en anden embedding provider/model for sammenligning af søgeresultater. Nyttigt til at teste forskellige modeller eller providere uden at påvirke hovedinstansen. |
-| `compare_search_results.py` | Sammenligner søgeresultater mellem hoved-API og shadow-API ved at køre prædefinerede søgninger og beregne overlap og Jaccard-score. Hjælper med at vurdere effekten af forskellige modeller/providere. |
-| `replace_chunks_nomic_table.py` | Værktøj til at erstatte indholdet af `chunks_nomic` tabellen med data fra en SQL dump fil. Bruges til at gendanne eller opdatere embedding data. |
-| `test_ollama_setup.py` | Tester Ollama-konfiguration og -funktionalitet ved at verificere service sundhed, modelhentning og test af embedding-generering. |
+# 2. Forudsætninger
+- Search stack kører allerede (`make -C soegemaskine up-local` eller `up-prod`)
+- `soegemaskine/.env` peger på den ønskede database + provider
+- Inputfil med én URL til en PDF pr. linje
+- Scriptet eksekveres på værten hvor Docker kører (lokal Mac eller via SSH på produktion)
 
-# 5. Valg af Providers
-- Embedding: set `EMBEDDING_PROVIDER` (openai/ollama/dummy)
-- Chunking: set `CHUNK_STRATEGY`
+# 3. Nøgleværktøjer
+| Element | Formål |
+|---------|--------|
+| `scripts/process_books.sh` | Kontrolskript for validering, kørsel, monitorering og genkørsler |
+| `create_embeddings/book_processor_wrapper.py` | Containermodul der udfører selve pipeline arbejdet |
+| `soegemaskine/docker-compose.embeddings.yml` | Definerer book-processor og Ollama services |
+| `scripts/setup_ollama.sh` | Trækker embedding-modellen i Ollama-containeren |
 
-# 6. Kørselseksempel
-
-### Anbefalet Workflow via Scripts
+# 4. Standardprocedure
 ```bash
-# 1. Validér konfiguration før kørsel
+# 1) Validér at miljøet er korrekt
 ./scripts/process_books.sh --validate
 
-# 2. Processér bøger fra fil
-./scripts/process_books.sh --file example_books.txt
+# 2) Kør batchen (erstatt filnavn med din egen liste)
+./scripts/process_books.sh --file batches/oktober.txt
 
-# 3. Overvåg fremgang
+# 3) Følg status undervejs
 ./scripts/process_books.sh --monitor
 
-# 4. Genprøv fejlede bøger
+# 4) Genkør evt. fejlede bøger
 ./scripts/process_books.sh --retry-failed
 ```
-> **Vigtigt:** Disse kommandoer skal køres på den maskine hvor Docker containerne afvikles. For lokal test er det din Mac; for produktion er det den eksterne Linux-server (via SSH).
 
-### Med Provider/Model Overriding
+- `--file` forventer en fil i værtsfilsystemet; scriptet kopierer den til `soegemaskine/book_input/`.
+- `--monitor` viser konsolideret status (json + loguddrag).
+- `--retry-failed` læser `book_failed/failed_books.json` og opretter en midlertidig kø.
+
+# 5. Midlertidige overrides
+| Flag | Funktion |
+|------|----------|
+| `--provider <navn>` | Forbigår PROVIDER i `.env` for den aktuelle kørsel (openai/ollama/dummy) |
+| `--model <model>` | Sætter modelvariabel ift. valg (OPENAI_MODEL eller OLLAMA_MODEL) |
+| `--validate` | Opretter mapper, sikrer rettigheder og kører containervalidering |
+| `--monitor` | Viser status, seneste loglinjer og fejlede bøger |
+
+Eksempel på override:
 ```bash
-# Brug specifik provider kun for denne kørsel
-./scripts/process_books.sh --file example_books.txt --provider openai
-
-# Brug specifik model
-./scripts/process_books.sh --file example_books.txt --model text-embedding-3-large
-
-# Midlertidig skift til lokal Ollama med specifik model
-./scripts/process_books.sh --file example_books.txt --provider ollama --model nomic-embed-text
+./scripts/process_books.sh --file batches/ollama.txt --provider ollama --model nomic-embed-text
 ```
 
-### Alternativ Direkte Kørsel (Avanceret)
-```bash
-# Aktivér miljø
-source .venv/bin/activate
+# 6. Artefakter og logfiler
+- Inputkopier: `soegemaskine/book_input/<filnavn>`
+- Status: `soegemaskine/book_output/processing_status.json`
+- Detaljerede logfiler: `soegemaskine/book_output/opret_bøger_<timestamp>.log`
+- Fejloversigt: `soegemaskine/book_failed/failed_books.json`
 
-# Direkte kørsel via Python modul
-python -m create_embeddings.book_processor_wrapper --input example_books.txt
-```
+Bevar relevante logfiler efter produktskørsler til audit og fejlanalyse.
 
-### Via Docker Compose (Avanceret)
-```bash
-# Kør via Docker Compose
-cd soegemaskine
-docker-compose --profile embeddings run --rm book-processor --input-file example_books.txt
-```
-> **Bemærk:** Alle Docker-kommandoer (`docker-compose build`, `docker-compose up`, `docker-compose run` osv.) skal køres direkte på værtsmaskinen for Docker-installationen.
+# 7. Idempotens og databasen
+- Pipeline springer automatisk bøger over, hvor embeddings allerede eksisterer for den aktive provider.
+- Postgres tabeller følger navngivning efter provider (`chunks`, `chunks_nomic`, `chunks_dummy`).
+- Kontrollér databasevolumen og backup rutiner før store batches.
 
-# 7. Overvågning
+# 8. Typiske fejl og afhjælpning
+| Symptomer | Årsag | Handling |
+|-----------|-------|----------|
+| `DATABASE_URL` mangler | `.env` ikke kopieret/valid | `cp env/<miljø>.env soegemaskine/.env` og kør `--validate` |
+| `Connect call failed` mod DB | Forkert host/port eller DB stoppet | Bekræft compose stack og port (5432 i containere, 5433 på værten) |
+| Provider-timeout | OpenAI/Ollama utilgængelig | Tjek `docker compose logs -f dho-ollama` eller API-nøgle |
+| `expected str, got list` | Defensiv fix skal logge konvertering | Undersøg logfil for bog og PDF-kvalitet |
+| Ingen nye chunks | PDF download/ekstraktion fejlede | Se logfil for details, valider URL og tilgængelighed |
 
-### Real-time Monitoring
-```bash
-# Se aktuel status og seneste logs
-./scripts/process_books.sh --monitor
-```
+# 9. Best practices
+- Kør små testbatcher (1-3 bøger) efter konfigurationsændringer.
+- Planlæg store kørsler uden for spidsbelastning.
+- Brug `--monitor` jævnligt og gem loguddrag.
+- Fjern forældede filer fra `book_input/` og `book_failed/` for at holde strukturen ren.
 
-### Log Filer
-- Log filer gemmes i `soegemaskine/book_output/opret_bøger_*.log` med tidsstempel
-- Tjek seneste log:
-```bash
-tail -100 soegemaskine/book_output/opret_bøger_*.log | less
-```
-
-### Status Filer
-- Processing status: `soegemaskine/book_output/processing_status.json`
-- Fejlede bøger: `soegemaskine/book_failed/failed_books.json`
-
-### Container Logs
-```bash
-# Se Docker container logs
-docker logs dho-book-processor
-```
-
-# 8. Genkørsel & Idempotens
-Systemet springer embeddings over hvis de allerede findes (provider + bog-ID).
-
-# 9. Fejlfinding
-| Problem | Årsag | Løsning |
-|---------|-------|---------|
-| "expected str, got list" | chunk_text var liste | Defensiv fix aktiv – check log |
-| Manglende OpenAI key | ENV ikke sat | Tilføj i `.env` |
-| Ingen chunks genereret | PDF extraction fejlede | Kontroller filsti / format |
-| Connection failed (port) | DB port mismatch | Kontroller POSTGRES_PORT i `.env` matcher faktisk port |
-| Ollama model ikke fundet | Model ikke installeret | Kør `./scripts/setup_ollama.sh` |
-| Validering fejler | ENV konfig inkomplet | Kør `python scripts/validate_env.py` for detaljeret fejlinfo |
-| Container starter ikke | Docker config problem | Tjek `docker-compose ps` og `docker logs` |
-| Fejlede bøger | Timeout/format/access | Se detaljer med `cat book_failed/failed_books.json` |
-| "No module named..." | Manglende dependency | Kontroller container rebuild efter ændringer |
-
-# 10. Performance Tips
-- Brug lokal Ollama for hurtig iteration
-- Batch større bøger uden at blande meget små (stabil throughput)
-
-# 11. Referencer
-- CHUNKING_STRATEGIER
-- PROVIDER_OVERSIGT
-- ENV_KONFIGURATION
-
-# 12. Lokal vs. Produktion
-
-| Scenario | Hvor kører du kommandoerne? | Nødvendige filer | Miljøvariabler |
-|----------|-----------------------------|------------------|-----------------|
-| Lokal udvikling | Terminal på din Mac | Bogliste (`example_books.txt`), lokale inputfiler | `soegemaskine/.env` med lokale database-/providerdetaljer |
-| Produktion | SSH-terminal på Linux-serveren | Bogliste kopieret til serveren, relevante ressourcer | `soegemaskine/.env` på serveren med produktionsdetaljer |
-
-## 12.1 Lokal Udvikling
-
-1. Sørg for at Docker kører på din Mac.
-2. Opdater `soegemaskine/.env` med lokale db-, provider- og modelindstillinger.
-3. Kør kommandoerne direkte i din lokale terminal:
-	```bash
-	./scripts/process_books.sh --validate
-	./scripts/process_books.sh --file example_books.txt
-	```
-
-## 12.2 Produktion Deployment
-
-1. Kopiér boglisten til produktion (f.eks. via `scp`).
-2. Opret SSH-forbindelse til produktionsserveren:
-	```bash
-	ssh bruger@server
-	```
-3. Navigér til projektets rodmappe (`SlægtBib/src`).
-4. Kør alle script- og Docker-kommandoer direkte på serveren:
-	```bash
-	cd soegemaskine
-	docker-compose build book-processor
-	cd ..
-	./scripts/process_books.sh --file dine_boeger.txt
-	```
-5. Bekræft at `soegemaskine/.env` på serveren er konfigureret til produktionsdatabasen, og at søge-API'ens `.env` forbliver uændret.
-
-> **Tip:** Book-processeringscontaineren kan genstartes og rebuildes uden at forstyrre den kørende søge-API, fordi de anvender separate Docker-services og `.env` filer.
+# 10. Relaterede dokumenter
+- `documentation/GUIDES/BOOK_UPDATES.md`
+- `documentation/CORE/03_DEPLOYMENT.md`
+- `documentation/REFERENCE/KONFIGURATION.md`
+- `documentation/TEKNISK/CHUNKING_STRATEGIER.md`

@@ -1,3 +1,7 @@
+Titel: Konfigurationseksempler
+Oprettet: 2025-10-07 15:33
+Sidst ændret: 2025-10-07 15:33
+
 # Konfigurationseksempler
 
 Dette directory indeholder komplette `.env` eksempler for forskellige scenarier og use cases.
@@ -46,7 +50,7 @@ nano .env
 
 | Eksempel | Provider | Chunk Strategy | Use Case |
 |----------|----------|----------------|----------|
-| Lokalt | Ollama | sentence_splitter | Udvikling, ingen API omkostninger |
+| Lokalt | Ollama | word_overlap | Udvikling, ingen API omkostninger |
 | Produktion | OpenAI | word_overlap | Production med høj kvalitet |
 | Test | Dummy | sentence_splitter | Automatiserede tests |
 | Performance | Ollama | word_overlap | Høj gennemstrømning |
@@ -74,6 +78,6 @@ Kontrollér at porte ikke konflikter med eksisterende services:
 
 ## 🔍 **Se Også**
 
-- **[Konfigurationsguide](../KONFIGURATION.md)** - Detaljeret forklaring af alle variabler
-- **[Installation Guide](../BRUGERGUIDER/INSTALLATION.md)** - Setup instruktioner
+- **[Konfigurationsguide](../REFERENCE/KONFIGURATION.md)** - Detaljeret forklaring af alle variabler
+- **[Lokal opsætning](../GUIDES/LOCAL_SETUP.md)** - Setup instruktioner
 - **[Chunking Strategier](../TEKNISK/CHUNKING_STRATEGIER.md)** - Guide til chunking valg
