@@ -80,10 +80,11 @@ API_ENDPOINT = "http://localhost:8080/search"
 Hvis du har brug for at ændre endpointet, rediger denne linje i `app.py`.
 
 ### Docker Setup
-GUI'en forventer at nginx containeren kører på port 8080 som konfigureret i `docker-compose.yml`:
+GUI'en forventer at nginx containeren kører på port 8080, eksponeret via `docker-compose.edge.yml` (start fx med `make -C soegemaskine up-prod`):
 ```yaml
+# soegemaskine/docker-compose.edge.yml
 ports:
-  - "8080:80"  # nginx HTTP port
+   - "8080:80"  # nginx HTTP port
 ```
 
 ## 🖥️ Platform Support
@@ -100,8 +101,8 @@ Testet og understøttet på:
 ❌ Connection Error: Kunne ikke forbinde til API serveren
 ```
 **Løsning:**
-- Kontrollér at Docker containerne kører: `docker-compose ps`
-- Genstart containerne: `docker-compose down && docker-compose up -d`
+- Kontrollér at stakken kører: `make -C soegemaskine ps-stacks`
+- Genstart edge stack: `make -C soegemaskine down-stacks && make -C soegemaskine up-prod`
 - Kontrollér at port 8080 er tilgængelig: `curl http://localhost:8080`
 
 ### Timeout Errors
@@ -118,8 +119,8 @@ Testet og understøttet på:
 ❌ HTTP Error: 500 - Internal Server Error
 ```
 **Løsning:**
-- Kontrollér API logs: `docker logs dhosearch`
-- Kontrollér nginx logs: `docker logs nginx`
+- Kontrollér API logs: `docker compose -f soegemaskine/docker-compose.base.yml logs searchapi`
+- Kontrollér nginx logs: `docker compose -f soegemaskine/docker-compose.edge.yml logs nginx`
 - Kontrollér environment variabler i `.env` filen
 
 ### Browser Link Issues
@@ -168,7 +169,7 @@ Prøv disse søgeforespørgsler:
 ## 🔗 Relaterede Filer
 
 - `dhosearch.py`: API implementation med response format
-- `docker-compose.yml`: Container konfiguration
+- Modulariserede compose filer i `soegemaskine/`: `docker-compose.base.yml`, `docker-compose.embeddings.yml`, `docker-compose.edge.yml`
 - `nginx/default.conf`: Nginx routing konfiguration
 
 ## 📝 Udvikling

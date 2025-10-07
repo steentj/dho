@@ -26,7 +26,7 @@
   - **Technical specifications:**
     - ✅ Created in `api_testgui/` folder
     - ✅ Streamlit framework for web-based GUI
-    - ✅ Updated to work with nginx endpoint from docker-compose.yml
+  - ✅ Updated til nginx endpointet fra docker-compose.edge.yml
     - ✅ Handles SearchResult format from dhosearch.py
     - ✅ Professional error handling for API connectivity
     - ✅ Support for updated response format with grouped results

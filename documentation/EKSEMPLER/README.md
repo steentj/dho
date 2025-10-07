@@ -1,6 +1,6 @@
 Titel: Konfigurationseksempler
 Oprettet: 2025-10-07 15:33
-Sidst ændret: 2025-10-07 15:33
+Sidst ændret: 2025-10-07 15:45
 
 # Konfigurationseksempler
 
@@ -8,15 +8,10 @@ Dette directory indeholder komplette `.env` eksempler for forskellige scenarier 
 
 ## 📁 **Tilgængelige Eksempler**
 
-### **Grundlæggende Setup**
+### **Tilgængelige filer**
 - **[.env.lokalt.eksempel](.env.lokalt.eksempel)** - Lokal udvikling med Ollama
 - **[.env.produktion.eksempel](.env.produktion.eksempel)** - Produktion med OpenAI
 - **[.env.test.eksempel](.env.test.eksempel)** - Testing med dummy provider
-
-### **Avancerede Konfigurationer**
-- **[.env.performance.eksempel](.env.performance.eksempel)** - Performance-optimeret setup
-- **[.env.sikkerhed.eksempel](.env.sikkerhed.eksempel)** - Sikkerhedsfokuseret konfiguration
-- **[.env.debugging.eksempel](.env.debugging.eksempel)** - Debug og udviklings setup
 
 ## 🚀 **Hurtig Start**
 
@@ -51,11 +46,8 @@ nano .env
 | Eksempel | Provider | Chunk Strategy | Use Case |
 |----------|----------|----------------|----------|
 | Lokalt | Ollama | word_overlap | Udvikling, ingen API omkostninger |
-| Produktion | OpenAI | word_overlap | Production med høj kvalitet |
+| Produktion | OpenAI | word_overlap | Produktion med høj kvalitet |
 | Test | Dummy | sentence_splitter | Automatiserede tests |
-| Performance | Ollama | word_overlap | Høj gennemstrømning |
-| Sikkerhed | OpenAI | sentence_splitter | Sikker produktion |
-| Debugging | Dummy | sentence_splitter | Fejlsøgning og udvikling |
 
 ## 🔧 **Tilpasning Guidelines**
 

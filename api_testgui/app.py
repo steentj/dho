@@ -4,7 +4,7 @@ import webbrowser
 from typing import Dict, Any
 
 # --- CONFIGURATION ---
-API_ENDPOINT = "http://localhost:8080/search"  # nginx endpoint from docker-compose.yml
+API_ENDPOINT = "http://localhost:8080/search"  # nginx endpoint eksponeret af docker-compose.edge.yml / make up-prod
 
 def display_search_result(result: Dict[str, Any], index: int):
     """Display a single search result with proper formatting."""
