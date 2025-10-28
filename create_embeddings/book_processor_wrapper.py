@@ -105,7 +105,7 @@ class BookProcessorWrapper:
             from create_embeddings.book_processing_orchestrator import BookProcessingApplication
             
             # Process books through the application orchestrator
-            await BookProcessingApplication.run_book_processing(
+            results = await BookProcessingApplication.run_book_processing(
                 database_url=database_url,
                 provider_name=provider,
                 api_key=api_key,
@@ -115,11 +115,10 @@ class BookProcessorWrapper:
                 concurrency_limit=5
             )
             
-            # Update counters based on orchestrator results
-            # Note: For now, we assume success since orchestrator doesn't return detailed counts
-            # This could be enhanced to track individual results
-            self.processed_count = self.total_count
-            self.failed_count = 0
+            # Update counters from actual orchestrator results
+            self.processed_count = results['successful']
+            self.failed_count = results['failed']
+            self.failed_books = results['failed_books']
             
             self.update_status("afsluttet")
             self.save_failed_books()

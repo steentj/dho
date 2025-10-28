@@ -135,7 +135,12 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
                     break
                 await asyncio.sleep(backoff * (2 ** attempt))
                 attempt += 1
-        raise RuntimeError(f"OpenAI embedding failed after {attempt+1} attempt(s): {last_error}")
+        # Preserve complete error details including exception type
+        error_type = type(last_error).__name__ if last_error else "Unknown"
+        error_msg = str(last_error) if last_error else "No error details available"
+        raise RuntimeError(
+            f"OpenAI embedding failed after {attempt+1} attempt(s): {error_type}: {error_msg}"
+        )
 
     async def _call_openai(self, chunk: str):
         response = await self.client.embeddings.create(input=chunk, model=self.model)

@@ -1,4 +1,4 @@
-# Stage 4: Edge / ingress layer (nginx TLS termination)
+ # Stage 4: Edge / ingress layer (nginx TLS termination)
 
 services:
   nginx:

@@ -1,4 +1,4 @@
-# Stage 4: Base services (database + search API)
+  # Stage 4: Base services (database + search API)
 # This file is combined with other overlay files for full stacks.
 
 services:

@@ -86,7 +86,7 @@ if [ "$VALIDATE_ONLY" = true ]; then
         echo "Warning: .env file not found in soegemaskine directory; skipping host validation" >&2
     fi
     # --no-deps ensures we reuse production postgres/ollama instead of trying to start new ones
-    docker-compose run --rm --no-deps book-processor --validate-config
+    docker-compose -f docker-compose.base.yml -f docker-compose.embeddings.yml run --rm --no-deps book-processor --validate-config
     exit $?
 fi
 
@@ -132,7 +132,7 @@ if [ "$RETRY_FAILED" = true ]; then
     
     echo "Retrying $failed_count failed books..."
     # Allow provider/model overrides on retry as well
-    DOCKER_CMD=(docker-compose run --rm --no-deps)
+    DOCKER_CMD=(docker-compose -f docker-compose.base.yml -f docker-compose.embeddings.yml run --rm --no-deps)
     if [ -n "$OVERRIDE_PROVIDER" ]; then
         case "$OVERRIDE_PROVIDER" in
             openai|ollama|dummy) DOCKER_CMD+=( -e PROVIDER="$OVERRIDE_PROVIDER" ) ;;
@@ -197,7 +197,7 @@ elif [ -n "$INPUT_FILE" ]; then
     echo ""
     
     # Build docker compose run command with ephemeral env overrides
-    DOCKER_CMD=(docker-compose run --rm --no-deps)
+    DOCKER_CMD=(docker-compose -f docker-compose.base.yml -f docker-compose.embeddings.yml run --rm --no-deps)
     if [ -n "$OVERRIDE_PROVIDER" ]; then
         DOCKER_CMD+=( -e PROVIDER="$OVERRIDE_PROVIDER" )
     fi

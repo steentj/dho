@@ -13,7 +13,8 @@ import asyncio
 import aiohttp
 import ssl
 import logging
-from typing import List
+from datetime import datetime
+from typing import List, Dict, Any
 from aiohttp import TCPConnector
 
 from .book_processing_pipeline import BookProcessingPipeline
@@ -99,16 +100,19 @@ class BookProcessingOrchestrator:
         except Exception as e:
             logger.exception(f"Error during cleanup: {type(e).__name__}")
     
-    async def process_books_from_urls(self, book_urls: List[str]) -> None:
+    async def process_books_from_urls(self, book_urls: List[str]) -> Dict[str, Any]:
         """
         Process multiple books from URLs with controlled concurrency.
         
         Args:
             book_urls: List of PDF URLs to process
+            
+        Returns:
+            Dict with keys: 'successful', 'failed', 'total', 'failed_books'
         """
         if not book_urls:
             logger.warning("No book URLs provided")
-            return
+            return {'successful': 0, 'failed': 0, 'total': 0, 'failed_books': []}
             
         logger.info(f"Starting processing of {len(book_urls)} books with concurrency limit {self.concurrency_limit}")
         
@@ -134,13 +138,31 @@ class BookProcessingOrchestrator:
             # Execute all tasks and collect results (including exceptions)
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Log summary
+            # Build detailed failure information
+            failed_books = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    failed_books.append({
+                        'url': book_urls[i],
+                        'error': f"{type(result).__name__}: {str(result)}",
+                        'timestamp': datetime.now().isoformat()
+                    })
+            
+            # Calculate summary
             successful = sum(1 for result in results if not isinstance(result, Exception))
             failed = len(results) - successful
             
             logger.info(
                 f"Processing completed: {successful} successful, {failed} failed out of {len(book_urls)} total"
             )
+            
+            # Return structured results
+            return {
+                'successful': successful,
+                'failed': failed,
+                'total': len(book_urls),
+                'failed_books': failed_books
+            }
     
     async def _process_book_with_semaphore(
         self, 
@@ -198,7 +220,7 @@ class BookProcessingApplication:
         chunk_size: int,
         url_file_path: str,
         concurrency_limit: int = 5
-    ) -> None:
+    ) -> Dict[str, Any]:
         """
         Run the complete book processing application.
         
@@ -212,6 +234,9 @@ class BookProcessingApplication:
             chunk_size: Maximum tokens per chunk
             url_file_path: Path to file containing book URLs
             concurrency_limit: Maximum concurrent processing tasks
+            
+        Returns:
+            Dict with keys: 'successful', 'failed', 'total', 'failed_books'
         """
         orchestrator = None
         
@@ -237,9 +262,11 @@ class BookProcessingApplication:
             await orchestrator.setup_dependencies()
             
             # Process all books
-            await orchestrator.process_books_from_urls(book_urls)
+            results = await orchestrator.process_books_from_urls(book_urls)
             
             logger.info("Book processing application completed successfully")
+            
+            return results
             
         except Exception as e:
             logger.exception(f"Book processing application failed: {type(e).__name__}")

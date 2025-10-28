@@ -218,8 +218,13 @@ class TestBookProcessorWrapper:
         mock_pipeline.load_urls_from_file.return_value = ["url1", "url2", "url3"]
         mock_pipeline_class.return_value = mock_pipeline
         
-        # Set up run_book_processing as an async mock
-        mock_application.run_book_processing = AsyncMock()
+        # Set up run_book_processing as an async mock that returns results
+        mock_application.run_book_processing = AsyncMock(return_value={
+            'successful': 3,
+            'failed': 0,
+            'total': 3,
+            'failed_books': []
+        })
         
         # Set up to track calls to update_status
         wrapper.update_status = MagicMock()
@@ -239,7 +244,7 @@ class TestBookProcessorWrapper:
             concurrency_limit=5
         )
         
-        # Verify counters were updated
+        # Verify counters were updated from orchestrator results
         assert wrapper.total_count == 3
         assert wrapper.processed_count == 3
         assert wrapper.failed_count == 0
