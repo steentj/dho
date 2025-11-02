@@ -12,19 +12,24 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
-# Try multiple common locations for .env file
+# Priority order:
+# 1. env/local.env - Local development (host access to Docker, port 5433)
+# 2. soegemaskine/.env - Production/container environment (postgres:5432)
 env_paths = [
+    'env/local.env',  # Local development (preferred for Mac development)
+    '../env/local.env',  # When running from subdirectory
+    Path(__file__).parent.parent.parent / 'env' / 'local.env',  # Relative to script
     '.env',  # Current working directory
-    'soegemaskine/.env',  # Common location when running from src
+    'soegemaskine/.env',  # Production/Docker environment
     '../soegemaskine/.env',  # When running from subdirectory
-    Path(__file__).parent.parent.parent / 'soegemaskine' / '.env',  # Relative to script location
+    Path(__file__).parent.parent.parent / 'soegemaskine' / '.env',  # Relative to script
 ]
 
 env_loaded = False
 for env_path in env_paths:
     if Path(env_path).exists():
         load_dotenv(dotenv_path=env_path, override=True)
-        logger.info(f"Loaded environment variables from: {env_path}")
+        logger.info(f"Loaded environment variables from: {Path(env_path).resolve()}")
         env_loaded = True
         break
 

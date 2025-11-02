@@ -5,11 +5,14 @@
 		}
 	],
 	"settings": {
-		"editor.fontSize": 14,
-		"terminal.integrated.fontSize": 14,
-		"chat.editor.fontSize": 14,
+		"editor.fontSize": 16,
+		"terminal.integrated.fontSize": 16,
+		"chat.editor.fontSize": 16,
 		"scm.inputFontSize": 14,
-		"debug.console.fontSize": 14,
-		"python.testing.pytestEnabled": true
+		"debug.console.fontSize": 16,
+		"python.testing.pytestEnabled": true,
+		"editor.formatOnPaste": false,
+		"chat.fontSize": 14,
+		"markdown.preview.fontSize": 16
 	}
 }

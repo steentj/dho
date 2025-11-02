@@ -148,6 +148,15 @@ with st.expander("ℹ️ API Information"):
     st.write("**Request format:**")
     st.json({"query": "example search text"})
     st.write("**Response format:** List of SearchResult objects with grouped chunks per book")
+    
+    # cURL example
+    st.write("**cURL command:**")
+    example_query = query.strip() if query and query.strip() else "example search text"
+    curl_command = f'''curl -X POST {API_ENDPOINT} \\
+  -H "Content-Type: application/json" \\
+  -d '{{"query": "{example_query}"}}'
+'''
+    st.code(curl_command, language="bash")
 
 if search_clicked or query:
     if not query.strip():
