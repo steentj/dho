@@ -122,6 +122,14 @@ up-minimal-clean:
 	@echo "Starting minimal stack (clean) and removing orphans" 
 	docker compose $(COMPOSE_BASE) up -d --remove-orphans
 
+up-search:
+	@echo "Starting search stack (base + nginx)"
+	docker compose $(COMPOSE_BASE) $(COMPOSE_EDGE) up -d
+
+up-search-build:
+	@echo "Building and starting search stack (base + nginx)"
+	docker compose $(COMPOSE_BASE) $(COMPOSE_EDGE) up -d --build
+
 up-local:
 	@echo "Starting local stack (base + embeddings services)"
 	docker compose $(COMPOSE_BASE) $(COMPOSE_EMBED) up -d

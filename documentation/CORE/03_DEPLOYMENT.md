@@ -1,9 +1,3 @@
-docker-compose --profile embeddings up --build -d
-docker-compose --profile embeddings up -d
-docker-compose --profile embeddings pull
-docker-compose --profile embeddings up -d --build
-docker-compose ps
-docker logs dho-ollama  # Hvis Ollama bruges
 Titel: Deployment Guide
 Version: v1.1
 Oprettet: 2025-09-04
@@ -23,29 +17,96 @@ Fokuserer på to manuelle målmiljøer: macOS udviklingsmaskiner og den dedikere
 Se også `documentation/GUIDES/LOCAL_SETUP.md` og `documentation/GUIDES/PRODUCTION_DEPLOY.md` for trin-for-trin eksempler.
 
 # 3. Lokal udvikling (macOS opsummering)
-1. Kopiér den skabeloniserede miljøfil til søgemaskinen:
+
+## 3.1 Make-kommandoer forklaring
+`make` er et build-automatiseringsværktøj der kører opgaver defineret i `soegemaskine/Makefile`. Flaget `-C soegemaskine` beder make skifte til `soegemaskine/`-mappen før kørsel.
+
+Eksempel: `make -C soegemaskine up-local` = skift til `soegemaskine/` og kør target `up-local`, som internt kalder `docker compose -f docker-compose.base.yml -f docker-compose.embeddings.yml up -d`.
+
+## 3.2 Kun søgning (minimal setup)
+Hvis du kun vil teste **søge-API'et** uden bogbehandling:
+
+1. Kopiér miljøfil:
 	```bash
 	cp env/local.env soegemaskine/.env
 	```
-2. Valider konfigurationen:
+2. Valider konfiguration:
 	```bash
 	python scripts/validate_env.py --file env/local.env
 	```
-3. Start de nødvendige services (PostgreSQL + embedding + FastAPI):
+3. Start **kun** PostgreSQL + SearchAPI (uden embedding/bogbehandling):
 	```bash
-	make -C soegemaskine up-local
+	make -C soegemaskine up-minimal
 	```
-	Kommandoen svarer til `docker compose -f docker-compose.base.yml -f docker-compose.embeddings.yml up -d`.
+	Dette starter kun `postgres` og `searchapi` containers (port 8080).
+
 4. Bekræft API-sundhed:
 	```bash
 	curl http://localhost:8080/healthz
 	curl http://localhost:8080/readyz
 	```
-5. Kør bog-pipelinevalidering eller batchjobs via `./scripts/process_books.sh` efter behov.
-6. Nedlukning:
+
+## 3.3 Med nginx reverse proxy (production-lignende)
+For at teste med nginx reverse proxy (som i produktion):
+
+1. Brug **up-prod** i stedet:
 	```bash
-	make -C soegemaskine down-stacks
+	make -C soegemaskine up-prod
 	```
+	Dette kombinerer base + embeddings + edge (nginx), og eksponerer API via nginx på port 8080.
+
+2. Test via nginx:
+	```bash
+	curl http://localhost:8080/healthz
+	```
+
+## 3.4 Fuld lokal udvikling (med bogbehandling)
+Til både søgning **og** bogbehandling:
+
+1. Kopiér miljøfil:
+	```bash
+	cp env/local.env soegemaskine/.env
+	```
+2. Valider konfiguration:
+	```bash
+	python scripts/validate_env.py --file env/local.env
+	```
+3. Start base + embeddings (PostgreSQL + SearchAPI + Ollama):
+	```bash
+	make -C soegemaskine up-local
+	```
+	Dette svarer til: `docker compose -f docker-compose.base.yml -f docker-compose.embeddings.yml up -d`
+
+4. Bekræft API-sundhed:
+	```bash
+	curl http://localhost:8080/healthz
+	curl http://localhost:8080/readyz
+	```
+5. Kør bog-pipelinevalidering eller batchjobs:
+	```bash
+	./scripts/process_books.sh
+	```
+
+## 3.5 Test GUI til søgning
+For at teste søgning via en lokal webgrænseflade:
+
+1. Sørg for at søge-API'et kører (se 3.2 eller 3.3 ovenfor).
+
+2. Start test-GUI'en:
+	```bash
+	cd api_testgui
+	./start_gui.sh
+	```
+
+3. Åbn browser på `http://localhost:8501` og test søgninger interaktivt.
+
+**Bemærk:** GUI'en forventer at API'et kører på `http://localhost:8080/search` (nginx endpoint).
+
+## 3.6 Nedlukning
+Stop alle services:
+```bash
+make -C soegemaskine down-stacks
+```
 
 # 4. Produktion (Linux)
 1. Synkronisér repositoriet:
@@ -110,8 +171,23 @@ Se også `documentation/GUIDES/LOCAL_SETUP.md` og `documentation/GUIDES/PRODUCTI
 - `scripts/process_books.sh` – validering, kørsel, monitorering af batchjobs
 - `scripts/setup_ollama.sh` – trækker `nomic-embed-text` ind i Ollama-containeren
 - `scripts/test_ollama_setup.py` – sundhedstjek af lokal Ollama
+- `api_testgui/app.py` – Streamlit-baseret web-GUI til interaktiv søgetestning (kræver `streamlit run`)
 
-# 10. Referencer
+# 10. Make targets oversigt
+Nyttige `make`-targets i `soegemaskine/Makefile`:
+
+| Target | Beskrivelse |
+|--------|-------------|
+| `make -C soegemaskine up-minimal` | Start kun postgres + searchapi (minimal setup) |
+| `make -C soegemaskine up-local` | Start base + embeddings (postgres + searchapi + ollama) |
+| `make -C soegemaskine up-prod` | Start alt inkl. nginx edge (production-lignende) |
+| `make -C soegemaskine down-stacks` | Stop alle services |
+| `make -C soegemaskine ps-stacks` | Vis kørende containers |
+| `make -C soegemaskine logs-stacks` | Følg logs fra alle services |
+| `make -C soegemaskine health-check` | Curl /healthz og /readyz endpoints |
+| `make -C soegemaskine shadow-up` | Start shadow search til A/B-test (port 18000) |
+
+# 11. Referencer
 - `documentation/GUIDES/LOCAL_SETUP.md`
 - `documentation/GUIDES/PRODUCTION_DEPLOY.md`
 - `documentation/REFERENCE/KONFIGURATION.md`
