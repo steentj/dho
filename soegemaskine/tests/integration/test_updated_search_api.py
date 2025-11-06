@@ -57,7 +57,7 @@ class TestUpdatedSearchAPIBehavior:
         assert len(results) == 6  # This will fail with current implementation
         
         # Should not include result with distance 0.6
-        distances = [result["distance"] for result in results]
+        distances = [result["min_distance"] for result in results]
         assert 0.6 not in distances
     
     @patch('searchapi.dhosearch.find_nærmeste')
@@ -85,14 +85,11 @@ class TestUpdatedSearchAPIBehavior:
         title1_result = next((r for r in results if r["titel"] == "Title 1"), None)
         assert title1_result is not None
         
-        # Should contain concatenated chunks
-        assert "---" in title1_result["chunk"]  # This will fail
-        assert "chunk1 text" in title1_result["chunk"]
-        assert "chunk2 text" in title1_result["chunk"]
-        
-        # Should contain page numbers as array
-        assert "pages" in title1_result  # Updated to match actual field name
-        assert title1_result["pages"] == [1, 3]  # Both page numbers
+        # Should contain list of chunks
+        assert "chunks" in title1_result
+        assert len(title1_result["chunks"]) == 2  # Two chunks from this book
+        assert "chunk1 text" in title1_result["chunks"][0]
+        assert "chunk2 text" in title1_result["chunks"][1]
     
     @patch('searchapi.dhosearch.find_nærmeste')  
     @patch('searchapi.dhosearch.embedding_provider')
@@ -116,9 +113,10 @@ class TestUpdatedSearchAPIBehavior:
         assert "pdf_navn" in result  # User-facing URL
         assert result["pdf_navn"] == "book1.pdf"  # No page number
         
-        # Should have internal URL with page number
-        assert "internal_url" in result  # Internal URL with page number
-        assert result["internal_url"] == "book1.pdf#page=5"  # With page number
+        # Should have chunks list with page info
+        assert "chunks" in result
+        assert len(result["chunks"]) > 0
+        assert "[Side 5]" in result["chunks"][0]  # Page info included in chunk text
     
     @patch('searchapi.dhosearch.find_nærmeste')
     @patch('searchapi.dhosearch.embedding_provider') 

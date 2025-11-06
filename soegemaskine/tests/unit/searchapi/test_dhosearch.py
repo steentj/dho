@@ -37,10 +37,7 @@ class TestSearchModels:
             "pdf_navn": "test.pdf",
             "titel": "Test Bog",
             "forfatter": "Test Forfatter",
-            "chunk": "Dette er en test chunk.",
-            "distance": 0.15,
-            "internal_url": "test.pdf#page=42",
-            "pages": [42, 43],
+            "chunks": ["[Side 42] Dette er en test chunk.", "[Side 43] Dette er endnu en chunk."],
             "min_distance": 0.15,
             "chunk_count": 2
         }
@@ -50,10 +47,7 @@ class TestSearchModels:
         assert result.pdf_navn == "test.pdf"
         assert result.titel == "Test Bog"
         assert result.forfatter == "Test Forfatter"
-        assert result.chunk == "Dette er en test chunk."
-        assert result.distance == 0.15
-        assert result.internal_url == "test.pdf#page=42"
-        assert result.pages == [42, 43]
+        assert result.chunks == ["[Side 42] Dette er en test chunk.", "[Side 43] Dette er endnu en chunk."]
         assert result.min_distance == 0.15
         assert result.chunk_count == 2
     
@@ -64,10 +58,7 @@ class TestSearchModels:
                 pdf_navn="test1.pdf",
                 titel="Test Bog 1",
                 forfatter="Forfatter 1",
-                chunk="Dette er en test chunk 1.",
-                distance=0.15,
-                internal_url="test1.pdf#page=42",
-                pages=[42],
+                chunks=["[Side 42] Dette er en test chunk 1."],
                 min_distance=0.15,
                 chunk_count=1
             ),
@@ -75,10 +66,7 @@ class TestSearchModels:
                 pdf_navn="test2.pdf",
                 titel="Test Bog 2",
                 forfatter="Forfatter 2",
-                chunk="Dette er en test chunk 2.",
-                distance=0.25,
-                internal_url="test2.pdf#page=10",
-                pages=[10, 11],
+                chunks=["[Side 10] Dette er en test chunk 2.", "[Side 11] Endnu en chunk."],
                 min_distance=0.25,
                 chunk_count=2
             )
@@ -386,10 +374,7 @@ class TestEndpoints:
                 "pdf_navn": "test.pdf",
                 "titel": "Test Bog",
                 "forfatter": "Test Forfatter",
-                "chunk": "[Side 42] Dette er en test chunk.",
-                "distance": 0.15,
-                "internal_url": "test.pdf#page=42",
-                "pages": [42],
+                "chunks": ["[Side 42] Dette er en test chunk."],
                 "min_distance": 0.15,
                 "chunk_count": 1
             }
@@ -525,12 +510,12 @@ class TestCreateResponseFormat:
         assert response[0]["pdf_navn"] == "test.pdf"
         assert response[0]["titel"] == "Test Bog"
         assert response[0]["forfatter"] == "Test Forfatter"
-        assert "[Side 42]" in response[0]["chunk"]
-        assert "[Side 43]" in response[0]["chunk"]
-        assert "Chunk 1 text" in response[0]["chunk"]
-        assert "Chunk 2 text" in response[0]["chunk"]
-        assert response[0]["internal_url"] == "test.pdf#page=42"  # First page
-        assert response[0]["pages"] == [42, 43]
+        assert "chunks" in response[0]
+        assert len(response[0]["chunks"]) == 2
+        assert "[Side 42]" in response[0]["chunks"][0]
+        assert "[Side 43]" in response[0]["chunks"][1]
+        assert "Chunk 1 text" in response[0]["chunks"][0]
+        assert "Chunk 2 text" in response[0]["chunks"][1]
         assert response[0]["min_distance"] == 0.15
         assert response[0]["chunk_count"] == 2
     
@@ -572,12 +557,14 @@ class TestCreateResponseFormat:
         # Check book 2 (first in results)
         assert response[0]["titel"] == "Test Bog 2"
         assert response[0]["min_distance"] == 0.10
-        assert "[Side 20]" in response[0]["chunk"]
+        assert "chunks" in response[0]
+        assert "[Side 20]" in response[0]["chunks"][0]
         
         # Check book 1 (second in results)
         assert response[1]["titel"] == "Test Bog 1"
         assert response[1]["min_distance"] == 0.15
-        assert "[Side 10]" in response[1]["chunk"]
+        assert "chunks" in response[1]
+        assert "[Side 10]" in response[1]["chunks"][0]
     
     def test_create_response_format_empty_input(self):
         """Test response format creation with empty input."""

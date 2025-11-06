@@ -23,29 +23,23 @@ def display_search_result(result: Dict[str, Any], index: int):
         if forfatter:
             meta_info.append(f"👤 Forfatter: {forfatter}")
         
-        distance = result.get('min_distance', result.get('distance', 0))
+        distance = result.get('min_distance', 0)
         meta_info.append(f"🎯 Relevans: {1-distance:.1%}")
         
         chunk_count = result.get('chunk_count', 1)
         meta_info.append(f"📄 {chunk_count} tekstafsnit")
         
-        pages = result.get('pages', [])
-        if pages:
-            page_str = f"Side {pages[0]}" if len(pages) == 1 else f"Sider {min(pages)}-{max(pages)}"
-            meta_info.append(f"📑 {page_str}")
-        
         st.markdown(f'<div class="result-meta">{" • ".join(meta_info)}</div>', unsafe_allow_html=True)
         
         # Content preview
-        chunk = result.get('chunk', '')
-        if chunk:
+        chunks = result.get('chunks', [])
+        if chunks:
             st.markdown('<div class="result-chunk">', unsafe_allow_html=True)
             
-            # Split chunks by separator and display each
-            chunks = chunk.split('\n\n---\n\n')
-            for chunk_part in chunks[:3]:  # Show max 3 chunks to avoid overwhelming
-                if chunk_part.strip():
-                    st.markdown(chunk_part.strip())
+            # Display chunks (show max 3 to avoid overwhelming)
+            for chunk_text in chunks[:3]:
+                if chunk_text.strip():
+                    st.markdown(chunk_text.strip())
                     if len(chunks) > 1:
                         st.markdown("---")
             
@@ -55,7 +49,7 @@ def display_search_result(result: Dict[str, Any], index: int):
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Action buttons
-        col1, col2, col3 = st.columns([2, 2, 1])
+        col1, col2 = st.columns([3, 1])
         
         with col1:
             user_url = result.get('pdf_navn', '')
@@ -67,15 +61,6 @@ def display_search_result(result: Dict[str, Any], index: int):
                     st.error(f"Kunne ikke åbne bog: {str(e)}")
         
         with col2:
-            internal_url = result.get('internal_url', '')
-            if internal_url and st.button("📍 Åbn på specifik side", key=f"open_internal_{index}"):
-                try:
-                    webbrowser.open_new_tab(internal_url)
-                    st.success("Åbner bog på specifik side i browser...")
-                except Exception as e:
-                    st.error(f"Kunne ikke åbne bog: {str(e)}")
-        
-        with col3:
             # Copy button for URL
             if st.button("📋", key=f"copy_{index}", help="Kopier link"):
                 st.code(user_url)

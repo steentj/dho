@@ -29,10 +29,7 @@ class SearchResult(BaseModel):
     pdf_navn: str  # User-facing URL without page number
     titel: str
     forfatter: str
-    chunk: str
-    distance: float
-    internal_url: str  # Internal URL with page number
-    pages: List[int]  # Array of page numbers
+    chunks: List[str]
     min_distance: float
     chunk_count: int
 
@@ -199,7 +196,7 @@ def group_results_by_book(resultater: list) -> dict:
 
 def create_response_format(grouped_results: dict) -> list:
     """
-    Create the new response format with grouped and concatenated results.
+    Create the new response format with grouped results.
     
     Args:
         grouped_results: Dictionary from group_results_by_book()
@@ -213,31 +210,18 @@ def create_response_format(grouped_results: dict) -> list:
         # Sort chunks by distance (best matches first)
         sorted_chunks = sorted(book_data['chunks'], key=lambda x: x['distance'])
         
-        # Concatenate chunks with separators
-        concatenated_text = []
-        for i, chunk_data in enumerate(sorted_chunks):
+        # Create list of chunk strings with page info
+        chunks_list = []
+        for chunk_data in sorted_chunks:
             chunk_text = extract_text_from_chunk(chunk_data['chunk'].replace("\n", " "))
             page_info = f"[Side {chunk_data['sidenr']}]"
-            concatenated_text.append(f"{page_info} {chunk_text}")
-        
-        combined_chunk = "\n\n---\n\n".join(concatenated_text)
-        
-        # Create user-facing URL (without page number) and internal URL (with page number)
-        user_facing_url = book_data['pdf_navn']  # Base filename without page number
-        internal_url = f"{book_data['pdf_navn']}#page={sorted_chunks[0]['sidenr']}"  # With page number of best match
-        
-        # Remove duplicates from pages and sort them
-        unique_pages = sorted(list(set(book_data['pages'])))
+            chunks_list.append(f"{page_info} {chunk_text}")
         
         result_item = {
-            "pdf_navn": user_facing_url,  # User-facing URL without page number
+            "pdf_navn": book_data['pdf_navn'],
             "titel": book_data['titel'],
             "forfatter": book_data['forfatter'],
-            "chunk": combined_chunk,
-            "distance": book_data['min_distance'],
-            # New fields for the updated response
-            "internal_url": internal_url,  # Internal URL with page number
-            "pages": unique_pages,  # Array of page numbers
+            "chunks": chunks_list,
             "min_distance": book_data['min_distance'],
             "chunk_count": len(sorted_chunks)
         }
