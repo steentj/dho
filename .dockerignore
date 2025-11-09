@@ -32,3 +32,16 @@
 **/values.dev.yaml
 LICENSE
 README.md
+
+# Exclude large directories not needed in containers
+markdown/
+pdf/
+htmlcov/
+*.sql
+test_data/
+tests/
+documentation/
+api_testgui/
+installation/
+scripts/
+webpage_flask/
