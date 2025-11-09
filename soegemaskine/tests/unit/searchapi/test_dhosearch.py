@@ -385,7 +385,7 @@ class TestEndpoints:
         client = TestClient(dhosearch.app)
         
         # Call the search endpoint
-        response = client.post("/search", json={"query": "test søgning"})
+        response = client.post("/search2", json={"query": "test søgning"})
         
         # Check response
         assert response.status_code == 200

@@ -74,7 +74,7 @@ streamlit run app.py
 ### API Endpoint
 Standard endpoint er konfigureret til nginx containeren:
 ```python
-API_ENDPOINT = "http://localhost:8080/search"
+API_ENDPOINT = "http://localhost:8080/search2"
 ```
 
 Hvis du har brug for at ændre endpointet, rediger denne linje i `app.py`.

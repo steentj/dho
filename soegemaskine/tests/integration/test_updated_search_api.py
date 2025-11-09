@@ -48,7 +48,7 @@ class TestUpdatedSearchAPIBehavior:
             # ("book7.pdf", "Title 7", "Author 7", 7, "chunk7", 0.6),  # Filtered out by SQL
         ]
         
-        response = self.client.post("/search", json={"query": "test query"})
+        response = self.client.post("/search2", json={"query": "test query"})
         
         assert response.status_code == 200
         results = response.json()  # No need for json.loads() since FastAPI returns proper JSON
@@ -73,7 +73,7 @@ class TestUpdatedSearchAPIBehavior:
             ("book2.pdf", "Title 2", "Author 2", 5, "##Title 2##chunk3 text", 0.3),
         ]
         
-        response = self.client.post("/search", json={"query": "test query"})
+        response = self.client.post("/search2", json={"query": "test query"})
         
         assert response.status_code == 200
         results = response.json()
@@ -101,7 +101,7 @@ class TestUpdatedSearchAPIBehavior:
             ("book1.pdf", "Title 1", "Author 1", 5, "##Title 1##chunk text", 0.3),
         ]
         
-        response = self.client.post("/search", json={"query": "test query"})
+        response = self.client.post("/search2", json={"query": "test query"})
         
         assert response.status_code == 200
         results = response.json()
@@ -125,7 +125,7 @@ class TestUpdatedSearchAPIBehavior:
         mock_embedding_provider.get_embedding = AsyncMock(return_value=[0.1] * 1536)
         mock_find_nearest.return_value = []
         
-        response = self.client.post("/search", json={"query": "test query"})
+        response = self.client.post("/search2", json={"query": "test query"})
         
         # Verify that find_nærmeste was called (which contains the SQL)
         mock_find_nearest.assert_called_once()
@@ -162,7 +162,7 @@ class TestEmbeddingProviderInjection:
         
         try:
             # Make request - this should use the injected embedding provider (dummy in this case)
-            response = self.client.post("/search", json={"query": "test query"})
+            response = self.client.post("/search2", json={"query": "test query"})
             
             assert response.status_code == 200
             results = response.json()
@@ -199,7 +199,7 @@ class TestEmbeddingProviderInjection:
         try:
             # This test verifies the configuration is properly passed to the provider
             # The actual API call is mocked, but we test that the right model would be used
-            response = self.client.post("/search", json={"query": "test query"})
+            response = self.client.post("/search2", json={"query": "test query"})
             
             assert response.status_code == 200
             # If we reach here, the embedding provider was successfully injected and used

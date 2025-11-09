@@ -131,8 +131,8 @@ class Input(BaseModel):
 async def rod_side():
     return({"Hej": "Dette er Dansk Historie Online: Semantisk søgning API - beta version"})
 
-@app.post("/search", response_model=List[SearchResult])
-async def search(request: Input) -> List[SearchResult]:
+@app.post("/search2", response_model=List[SearchResult])
+async def search2(request: Input) -> List[SearchResult]:
     print(f'Søger efter "{request.query}"...')
     
     # Use the injected embedding provider instead of direct OpenAI client

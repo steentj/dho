@@ -120,8 +120,8 @@ def create_mock_fastapi_app():
         async def root():
             return {"Hej": "Dette er Dansk Historie Online: Semantisk søgning API"}
         
-        @app.post("/search")
-        async def search(request: dict):
+        @app.post("/search2")
+        async def search2(request: dict):
             return [
                 {
                     "pdf_navn": "test_book.pdf",
