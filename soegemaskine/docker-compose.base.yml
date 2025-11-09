@@ -10,7 +10,7 @@ services:
     volumes:
       - ${HOME}/dhoDbData:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5433:5432"  # Only accessible from localhost
+      - "127.0.0.1:5432:5432"  # Only accessible from localhost
     networks:
       - dho-network
     restart: always
@@ -26,6 +26,7 @@ services:
     build:
       context: ..
       dockerfile: soegemaskine/searchapi/Dockerfile
+    # image: dhosearchapi:0.2
     container_name: dhosearch
     env_file:
       - .env
