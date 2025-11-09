@@ -9,6 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# Første version af søgning
+import json
+from openai import OpenAI
+
+# Slut på første version af søgning
+
 # Central configuration
 from config.config_loader import get_config, refresh_config
 
@@ -232,6 +238,69 @@ def create_response_format(grouped_results: dict) -> list:
     response.sort(key=lambda x: x['min_distance'])
     
     return response
+
+### Første version af søgning
+
+@app.post("/search")
+async def search(request: Input):
+    load_dotenv()
+    openai_key = os.getenv("OPENAI_API_KEY", None)
+    client = OpenAI()
+    client.api_key = openai_key
+
+    vektor = get_embedding_gammel(request.query, client)
+
+    resultater = await find_nærmeste_gammel(vektor)
+    
+    dokumenter = [
+        dict(zip(("pdf_navn", "titel", "forfatter", "sidenr", "chunk", "distance"), result))
+        for result in resultater
+    ]
+
+    for dokument in dokumenter:
+        dokument["chunk"] = dokument["chunk"].replace("\n", " ")
+        dokument["forfatter"] = (
+            dokument["forfatter"]
+            if dokument["forfatter"] == "None" or dokument["forfatter"]
+            else ""
+        )
+        dokument["pdf_navn"] = f'{dokument["pdf_navn"]}#page={str(dokument["sidenr"])}'
+        dokument["chunk"] = extract_text_from_chunk(dokument["chunk"]) # Fjerner bogtitlen fra chunken
+  
+    return json.dumps(dokumenter)
+
+async def find_nærmeste_gammel(vektor: list,) -> list:
+    try:
+        tabel = "chunks"
+        distance_operator = "<=>"
+
+        sql = f"""
+            SELECT b.pdf_navn, b.titel, b.forfatter, c.sidenr, c.chunk, 
+                   c.embedding {distance_operator} $1 AS distance
+            FROM {tabel} c 
+            JOIN books b ON c.book_id = b.id 
+            WHERE length(trim(c.chunk)) > 20 
+            ORDER BY c.embedding {distance_operator} $1 
+            LIMIT 5
+        """
+        
+        # Pass the vector directly as a list - db_service uses pgvector-registered connection
+        results = await db_service.fetchall(sql, vektor)
+                
+    except Exception as e:
+        print(f"Fejl ved indlæsning af databasen: {e}")
+        results = []
+
+    return results
+
+def get_embedding_gammel(text, client, model="text-embedding-3-small"):
+    text = text.replace("\n", " ")
+    embeddings = (
+        client.embeddings.create(input=[text], model=model).data[0].embedding
+    )
+    return embeddings
+
+# Slut på første version af søgning
 
 async def find_nærmeste(vektor: list) -> list:
     """

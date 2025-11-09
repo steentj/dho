@@ -1,10 +1,63 @@
 import streamlit as st
 import requests
 import webbrowser
+import json
 from typing import Dict, Any
 
 # --- CONFIGURATION ---
-API_ENDPOINT = "http://localhost:8080/search2"  # nginx endpoint eksponeret af docker-compose.edge.yml / make up-prod
+API_ENDPOINT_V1 = "http://localhost:8080/search"   # Original endpoint - flat list of chunks (LIMIT 5)
+API_ENDPOINT_V2 = "http://localhost:8080/search2"  # New endpoint - grouped by book
+
+def display_search_result_v1(result: Dict[str, Any], index: int):
+    """Display a single search result from /search endpoint (original format)."""
+    
+    with st.container():
+        st.markdown('<div class="search-result">', unsafe_allow_html=True)
+        
+        # Title and basic info
+        titel = result.get('titel', 'Ingen titel')
+        forfatter = result.get('forfatter', '')
+        
+        st.markdown(f'<div class="result-title">📖 {index}. {titel}</div>', unsafe_allow_html=True)
+        
+        # Metadata
+        meta_info = []
+        if forfatter:
+            meta_info.append(f"👤 Forfatter: {forfatter}")
+        
+        distance = result.get('distance', 0)
+        meta_info.append(f"🎯 Relevans: {1-distance:.1%}")
+        
+        sidenr = result.get('sidenr', 'N/A')
+        meta_info.append(f"📄 Side {sidenr}")
+        
+        st.markdown(f'<div class="result-meta">{" • ".join(meta_info)}</div>', unsafe_allow_html=True)
+        
+        # Content preview
+        chunk = result.get('chunk', '')
+        if chunk:
+            st.markdown('<div class="result-chunk">', unsafe_allow_html=True)
+            st.markdown(chunk.strip())
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Action buttons
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            pdf_url = result.get('pdf_navn', '')
+            if pdf_url and st.button("📖 Åbn bog", key=f"open_v1_{index}"):
+                try:
+                    webbrowser.open_new_tab(pdf_url)
+                    st.success("Åbner bog i browser...")
+                except Exception as e:
+                    st.error(f"Kunne ikke åbne bog: {str(e)}")
+        
+        with col2:
+            # Copy button for URL
+            if st.button("📋", key=f"copy_v1_{index}", help="Kopier link"):
+                st.code(pdf_url)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def display_search_result(result: Dict[str, Any], index: int):
     """Display a single search result with proper formatting."""
@@ -120,6 +173,19 @@ st.markdown("**API Test Interface**")
 st.markdown("Enter your search query below to test the semantic search API through the nginx endpoint.")
 st.markdown('</div>', unsafe_allow_html=True)
 
+# API Version Toggle
+st.markdown("### API Version")
+api_version = st.radio(
+    "Vælg API version:",
+    options=["v2", "v1"],
+    format_func=lambda x: "Version 2 (Grupperet per bog)" if x == "v2" else "Version 1 (Flad liste, max 5)",
+    horizontal=True,
+    help="V1: Original endpoint med max 5 chunks som flad liste\nV2: Ny endpoint med chunks grupperet per bog"
+)
+
+# Set endpoint based on selection
+API_ENDPOINT = API_ENDPOINT_V2 if api_version == "v2" else API_ENDPOINT_V1
+
 # Search input
 col1, col2 = st.columns([4, 1])
 with col1:
@@ -132,7 +198,13 @@ with st.expander("ℹ️ API Information"):
     st.code(f"Endpoint: {API_ENDPOINT}")
     st.write("**Request format:**")
     st.json({"query": "example search text"})
-    st.write("**Response format:** List of SearchResult objects with grouped chunks per book")
+    
+    if api_version == "v1":
+        st.write("**Response format:** JSON string containing list of individual chunks (max 5)")
+        st.write("**Fields:** pdf_navn (with #page=N), titel, forfatter, sidenr, chunk, distance")
+    else:
+        st.write("**Response format:** List of SearchResult objects with grouped chunks per book")
+        st.write("**Fields:** pdf_navn, titel, forfatter, chunks (list), min_distance, chunk_count")
     
     # cURL example
     st.write("**cURL command:**")
@@ -157,16 +229,29 @@ if search_clicked or query:
                     headers={"Content-Type": "application/json"}
                 )
                 response.raise_for_status()
-                results = response.json()
+                
+                # Parse response based on API version
+                if api_version == "v1":
+                    # V1 returns JSON string that needs to be parsed
+                    results = json.loads(response.json()) if isinstance(response.json(), str) else response.json()
+                else:
+                    # V2 returns list directly
+                    results = response.json()
                 
                 if not results:
                     st.info("📭 Ingen resultater fundet for din søgning.")
                 else:
-                    st.success(f"✅ Fundet {len(results)} bog(er) med relevante resultater")
+                    if api_version == "v1":
+                        st.success(f"✅ Fundet {len(results)} tekstafsnit (max 5)")
+                    else:
+                        st.success(f"✅ Fundet {len(results)} bog(er) med relevante resultater")
                     
-                    # Display results
+                    # Display results based on API version
                     for i, result in enumerate(results, 1):
-                        display_search_result(result, i)
+                        if api_version == "v1":
+                            display_search_result_v1(result, i)
+                        else:
+                            display_search_result(result, i)
                         
             except requests.exceptions.ConnectionError:
                 st.error("❌ **Connection Error**: Kunne ikke forbinde til API serveren. Kontroller at nginx containeren kører på localhost:8080")
