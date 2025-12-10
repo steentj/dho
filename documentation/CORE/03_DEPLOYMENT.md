@@ -1,7 +1,7 @@
 Titel: Deployment Guide
-Version: v1.1
+Version: v1.2
 Oprettet: 2025-09-04
-Sidst ændret: 2025-10-07
+Sidst ændret: 2025-12-10
 Ejerskab: Driftansvarlig
 Formål: Sikre reproducerbar manuel udrulning i lokal og produktionsmiljø.
 
@@ -141,10 +141,31 @@ make -C soegemaskine down-stacks
 	./scripts/process_books.sh --validate
 	```
 
-# 5. Shadow / staging (valgfrit)
-- Brug `make shadow-up` / `shadow-up-ollama` til parallel søgning på port 18000.
-- Sammenlign resultater med `make shadow-compare` eller `scripts/compare_search_results.py`.
-- Stop med `make shadow-down`.
+# 5. Container Sikkerhed
+## 5.1 Non-Root Security Configuration
+Alle produktions-containere kører nu som non-root brugere for maksimal sikkerhed:
+
+| Container | Bruger | UID | Status |
+|-----------|--------|-----|--------|
+| dhosearch | searchuser | 1000 | ✅ Non-root |
+| dho-book-processor | bookuser | 1000 | ✅ Non-root |
+| nginx | nginx | 101 | ✅ Vendor default |
+| dhodb | postgres | variabel | ℹ️ Vendor default |
+
+**Ollama (Development Only):** `dho-ollama` kører som root (UID 0) men anvendes KUN i development/test (`make up-local`). Containeren er IKKE inkluderet i produktion.
+
+## 5.2 Deployment Security Checklist
+Før deployment til produktion:
+```bash
+# Verificer non-root status
+docker exec dhosearch id
+# Output: uid=1000(searchuser) gid=1000(searchuser)
+
+docker exec dho-book-processor id  
+# Output: uid=1000(bookuser) gid=1000(bookuser)
+```
+
+Se detaljeret security dokumentation i `documentation/TEKNISK/DOCKER_SECURITY.md`.
 
 # 6. Konfigurationsstyring
 - Primære skabeloner findes i `.env.template` og `env/`-mapperne.
@@ -154,8 +175,11 @@ make -C soegemaskine down-stacks
 # 7. Rollback strategi
 1. Stop services: `make -C soegemaskine down-stacks`.
 2. Tjek foregående tag/commit ud: `git checkout <tag>`.
-3. Start igen med `make -C soegemaskine up-prod`.
-4. Gentag sundhedstjek og pipeline-validering.
+3. Rebuild images hvis nødvendigt: `docker compose build --no-cache`.
+4. Start igen med `make -C soegemaskine up-prod`.
+5. Gentag sundhedstjek og pipeline-validering.
+
+**Security Rollback:** Hvis permission issues opstår efter deployment, se rollback procedure i `documentation/TEKNISK/DOCKER_SECURITY.md`.
 
 # 8. Fejlfinding (udvalg)
 | Problem | Handling |
@@ -179,13 +203,13 @@ Nyttige `make`-targets i `soegemaskine/Makefile`:
 | Target | Beskrivelse |
 |--------|-------------|
 | `make -C soegemaskine up-minimal` | Start kun postgres + searchapi (minimal setup) |
-| `make -C soegemaskine up-local` | Start base + embeddings (postgres + searchapi + ollama) |
-| `make -C soegemaskine up-prod` | Start alt inkl. nginx edge (production-lignende) |
+| `make -C soegemaskine up-search` | Start base + nginx (search stack) |
+| `make -C soegemaskine up-local` | Start base + embeddings (postgres + searchapi + ollama) - **Development only** |
+| `make -C soegemaskine up-prod` | Start alt inkl. nginx edge (production - inkl. ollama hvis embeddings.yml anvendes) |
 | `make -C soegemaskine down-stacks` | Stop alle services |
 | `make -C soegemaskine ps-stacks` | Vis kørende containers |
 | `make -C soegemaskine logs-stacks` | Følg logs fra alle services |
 | `make -C soegemaskine health-check` | Curl /healthz og /readyz endpoints |
-| `make -C soegemaskine shadow-up` | Start shadow search til A/B-test (port 18000) |
 
 # 11. Referencer
 - `documentation/GUIDES/LOCAL_SETUP.md`

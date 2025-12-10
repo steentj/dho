@@ -151,38 +151,3 @@ ps-stacks:
 
 logs-stacks:
 	docker compose $(COMPOSE_BASE) logs -f
-
-# ---------------------------------------------------------------------------
-# Stage 5 Shadow Search Targets
-# ---------------------------------------------------------------------------
-
-SHADOW_COMPOSE=-f docker-compose.base.yml -f docker-compose.shadow.yml
-
-.PHONY: shadow-up shadow-up-ollama shadow-up-openai shadow-down shadow-query shadow-compare
-
-shadow-up:
-	@echo "Starting shadow search (inherits provider from .env)"
-	docker compose $(SHADOW_COMPOSE) up -d postgres searchapi-shadow
-
-shadow-up-ollama:
-	@echo "Starting shadow search with provider=ollama"
-	docker compose $(SHADOW_COMPOSE) up -d postgres
-	docker compose $(SHADOW_COMPOSE) rm -f searchapi-shadow >/dev/null 2>&1 || true
-	docker compose $(SHADOW_COMPOSE) run -d --name dhosearch-shadow -e PROVIDER=ollama -e OLLAMA_MODEL=nomic-embed-text searchapi-shadow
-
-shadow-up-openai:
-	@echo "Starting shadow search with provider=openai"
-	docker compose $(SHADOW_COMPOSE) up -d postgres
-	docker compose $(SHADOW_COMPOSE) rm -f searchapi-shadow >/dev/null 2>&1 || true
-	docker compose $(SHADOW_COMPOSE) run -d --name dhosearch-shadow -e PROVIDER=openai searchapi-shadow
-
-shadow-down:
-	@echo "Stopping shadow search"
-	docker compose $(SHADOW_COMPOSE) down --remove-orphans
-
-shadow-query:
-	@read -p "Enter query: " q; curl -s -X POST http://localhost:18000/search -H 'Content-Type: application/json' -d '{"query": "'"$$q"'"}' | python3 -m json.tool
-
-shadow-compare:
-	python ../scripts/compare_search_results.py --queries shadow_queries.txt --main http://localhost:8080 --shadow http://localhost:18000 --top 5 --output shadow_comparison.json
-	@echo "Comparison written to soegemaskine/shadow_comparison.json"
