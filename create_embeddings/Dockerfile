@@ -28,7 +28,8 @@ COPY create_embeddings/book_processor_wrapper.py .
 RUN mkdir -p /app/input /app/output /app/failed
 
 # Set up non-root user
-RUN useradd -m -u 1000 bookuser && chown -R bookuser:bookuser /app
+RUN groupadd -r bookuser -g 1000 && useradd -r -g bookuser -u 1000 bookuser
+RUN chown -R bookuser:bookuser /app
 USER bookuser
 
 ENTRYPOINT ["python", "book_processor_wrapper.py"]
