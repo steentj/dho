@@ -24,7 +24,48 @@ Dette dokument beskriver sikkerhedskonfigurationen for DHO Semantic Search Syste
 
 ## Sikkerhedsprincipper
 
-### 1. Non-Root Container Execution
+### 1. Docker Daemon User Namespace Remapping
+
+**Rationale:** User namespace remapping mapper container UIDs til uprivilegerede host UIDs, hvilket giver et ekstra sikkerhedslag. Selv hvis en angriber escaper fra en container, vil de have et umappe host-UID uden rettigheder.
+
+**Implementation:** Konfiguration via `/etc/docker/daemon.json`:
+
+```json
+{
+  "userns-remap": "default"
+}
+```
+
+Dette aktiverer automatisk mapping hvor container UID 0 (root) mappes til et uprivilegeret host-UID (typisk 100000+).
+
+**Deployment procedure:**
+1. Stop alle containere: `docker compose down`
+2. Kopier `daemon.json` til `/etc/docker/daemon.json` på host
+3. Genstart Docker daemon: `sudo systemctl restart docker`
+4. Verificer: `docker info | grep -i "user namespace"`
+   - Forventet output: `User Namespaces: ID maps: ...`
+5. Start containere igen: `docker compose up -d`
+
+**Volume ownership efter aktivering:**
+Eksisterende volumes kan kræve chown, særligt PostgreSQL data:
+```bash
+# Backup først!
+sudo cp -a /var/lib/docker/volumes /var/lib/docker/volumes.backup
+
+# Find mapping UID (typisk 100000)
+grep dockremap /etc/subuid
+
+# Juster volume ownership hvis nødvendigt
+sudo chown -R 100000:100000 /var/lib/docker/volumes/dho_postgres_data/_data
+```
+
+**Rollback procedure:**
+1. Stop containere: `docker compose down`
+2. Fjern `"userns-remap"` fra `/etc/docker/daemon.json`
+3. Genstart Docker daemon: `sudo systemctl restart docker`
+4. Gendan volume ownership hvis justeret: `sudo chown -R 999:999 /var/lib/docker/volumes/dho_postgres_data/_data`
+
+### 2. Non-Root Container Execution
 
 **Rationale:** Containere der kører som root udgør en betydelig sikkerhedsrisiko. Hvis en angriber kompromitterer containeren, har de root-rettigheder, hvilket kan bruges til:
 - Privilege escalation på host-systemet
@@ -33,7 +74,7 @@ Dette dokument beskriver sikkerhedskonfigurationen for DHO Semantic Search Syste
 
 **Implementation:** Alle produktions-containere kører nu som non-root brugere med UID 1000 (searchuser, bookuser) eller vendor defaults (nginx uid=101).
 
-### 2. Least Privilege Principle
+### 3. Least Privilege Principle
 
 Hver container har kun de rettigheder der er nødvendige for dens specifikke funktion:
 - **Search API:** Read-only database access, ingen volume mounts
@@ -41,7 +82,7 @@ Hver container har kun de rettigheder der er nødvendige for dens specifikke fun
 - **PostgreSQL:** Isoleret data directory med strenge permissions
 - **Nginx:** Read-only config og certificate files
 
-### 3. Network Isolation
+### 4. Network Isolation
 
 - Internal `dho-network` bridge network
 - Kun nginx eksponerer eksterne porte (80, 443, 8080)
@@ -161,6 +202,28 @@ make up-local      # base + embeddings (inkl. ollama)
 **Security:** ⚠️ Ollama kører som root (accepteret i dev)
 
 ## Verificering af Security Configuration
+
+### User Namespace Remapping Status
+
+Verificer at daemon-level namespace remapping er aktiveret:
+
+```bash
+# Check Docker daemon configuration
+docker info | grep -i "user namespace"
+
+# Forventet output hvis aktiveret:
+# Security Options: ...
+#  userns
+
+# Check subuid/subgid mappings
+grep dockremap /etc/subuid
+grep dockremap /etc/subgid
+
+# Forventet output (typisk):
+# dockremap:100000:65536
+```
+
+Hvis namespace remapping er aktiveret, vil container processes have UIDs mappet til 100000+ på host-systemet, selv om de ser UID 0 eller 1000 inde i containeren.
 
 ### Quick Security Check
 
@@ -298,6 +361,13 @@ Nginx container starter som root men nginx worker processes kører som nginx-bru
 - [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker)
 
 ## Changelog
+
+### 2025-12-10: User Namespace Remapping Konfiguration
+- ✅ Tilføjet `daemon.json` med `userns-remap: default` konfiguration
+- ✅ Dokumenteret deployment procedure for namespace remapping
+- ✅ Beskrevet volume ownership håndtering efter aktivering
+- ✅ Tilføjet rollback procedure for namespace remapping
+- ✅ Opdateret verifikations-kommandoer med namespace status check
 
 ### 2025-12-10: Initial Security Audit
 - ✅ Opdateret `soegemaskine/searchapi/Dockerfile` med searchuser (UID 1000)

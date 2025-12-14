@@ -5,6 +5,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: dhodb
+    userns_mode: "host"
     env_file:
       - .env
     volumes:
